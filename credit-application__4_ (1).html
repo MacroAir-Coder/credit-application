@@ -1,0 +1,2322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MacroAir Credit Application</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════
+   1. TOKENS (mirrors macroair-fan-schedule.html)
+═══════════════════════════════════════════════ */
+/* DARK = charcoal/dark-navy, off-white text. LIGHT = soft warm-white. */
+:root {
+  --bg:#1c2535; --bg-2:#222d40;
+  --card:#283246; --card-solid:#283246;
+  --surface-2:rgba(255,255,255,0.04); --surface-3:rgba(255,255,255,0.08); --surface-hover:rgba(255,255,255,0.06);
+  --text:#f4f6fa; --text-2:#cdd5e0; --text-muted:#8794a8;
+  --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.16); --border-accent:rgba(0,164,228,0.35);
+  --accent:#00a4e4; --accent-2:#0090c8; --accent-dim:rgba(0,164,228,0.14); --accent-glow:rgba(0,164,228,0.18);
+  --success:#0fba8e; --danger:#e05454; --warning:#e6b040;
+  --shadow-lg:0 12px 32px rgba(0,0,0,0.32); --shadow-md:0 6px 16px rgba(0,0,0,0.22); --shadow-sm:0 2px 6px rgba(0,0,0,0.16);
+  --radius-xl:14px; --radius-lg:12px; --radius-md:10px; --radius-sm:6px;
+  --section-gap:28px; --label-gap:8px; --card-pad:22px; --input-h:40px;
+  --font:'DM Sans',ui-sans-serif,system-ui,sans-serif; --mono:'DM Mono',monospace;
+}
+html.light {
+  --bg:#f5f7fa; --bg-2:#eef2f7;
+  --card:#ffffff; --card-solid:#fff;
+  --surface-2:rgba(15,23,42,0.04); --surface-3:rgba(15,23,42,0.07); --surface-hover:rgba(15,23,42,0.05);
+  --text:#0d1420; --text-2:#2c3e55; --text-muted:#5c7080;
+  --border:rgba(15,23,42,0.09); --border-strong:rgba(15,23,42,0.16); --border-accent:rgba(0,130,200,0.25);
+  --accent:#0081c7; --accent-2:#006bad; --accent-dim:rgba(0,130,200,0.10); --accent-glow:rgba(0,130,200,0.14);
+  --shadow-lg:0 8px 28px rgba(15,23,42,0.07); --shadow-md:0 4px 12px rgba(15,23,42,0.05); --shadow-sm:0 1px 3px rgba(15,23,42,0.04);
+}
+
+/* ═══════════════════════════════════════════════
+   2. RESET / GLOBAL
+═══════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;transition:background .25s,color .25s}
+input,select,textarea,button{font-family:var(--font)}
+a{color:var(--accent)}
+
+/* Solid background — restrained, enterprise-appropriate. */
+body{ background: var(--bg); }
+
+.app-shell{position:relative;z-index:1;width:100%;margin:0;padding:24px 64px 80px}
+@media(max-width:900px){.app-shell{padding:18px 32px 60px}}
+@media(max-width:600px){.app-shell{padding:14px 18px 50px}}
+
+/* Floating theme toggle, top-right of the entire form */
+#theme-toggle{
+  position:absolute;top:14px;right:64px;z-index:210;
+  display:inline-flex;align-items:center;gap:6px;
+  height:30px;padding:0 12px;border-radius:999px;
+  background:var(--card);border:1px solid var(--border-strong);
+  color:var(--text-2);font-size:11.5px;font-weight:600;letter-spacing:.04em;
+  cursor:pointer;font-family:var(--font);transition:all .15s;text-transform:uppercase;
+  box-shadow:var(--shadow-sm);
+}
+#theme-toggle:hover{background:var(--surface-3);color:var(--text);border-color:var(--accent)}
+#theme-toggle .ti{display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1}
+@media(max-width:900px){#theme-toggle{right:32px}}
+@media(max-width:600px){#theme-toggle{right:18px;padding:0 10px}#theme-toggle .tlabel{display:none}}
+
+/* ═══════════════════════════════════════════════
+   3. TWO-COLUMN LAYOUT — form left, sticky summary right
+═══════════════════════════════════════════════ */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start;margin-top:24px}
+@media(max-width:1100px){.layout{grid-template-columns:1fr;gap:0}}
+.form-col{min-width:0}
+
+/* Sticky sidebar: follows the viewport as you scroll the form. If the panel
+   is taller than the window (small laptops), it caps to viewport height and
+   scrolls internally — otherwise sticky silently fails to pin fully. */
+.summary-col{position:sticky;top:24px;align-self:start;display:flex;flex-direction:column;max-height:calc(100vh - 48px);overflow-y:auto}
+.summary-col .section-label{margin-top:0}
+@media(max-width:1100px){
+  .summary-col{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:150;background:var(--card);border-top:1px solid var(--border-strong);box-shadow:0 -8px 24px rgba(0,0,0,0.18);padding:0;margin:0}
+  .form-col{padding-bottom:130px}
+}
+
+.summary-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius-xl);padding:20px;box-shadow:var(--shadow-md);
+}
+@media(max-width:1100px){.summary-card{border-radius:0;border:none;padding:14px 18px;box-shadow:none}}
+
+/* (theme toggle moved out — now top-right of .app-shell) */
+
+.progress-wrap{margin-bottom:16px}
+.progress-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.progress-row b{color:var(--text);font-size:13px;font-weight:700;letter-spacing:0;text-transform:none}
+.progress-bar{height:6px;background:var(--surface-3);border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),#3ec1ee);width:0%;transition:width .3s ease}
+
+.sec-list{display:flex;flex-direction:column;gap:2px;margin:0 -6px 14px}
+@media(max-width:1100px){.sec-list{display:none}}
+.sec-link{
+  display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--radius-sm);
+  background:transparent;border:none;cursor:pointer;text-align:left;
+  color:var(--text-2);font-size:12.5px;font-weight:500;font-family:var(--font);
+  transition:all .12s;
+}
+.sec-link:hover{background:var(--surface-2);color:var(--text)}
+.sec-link.active{background:var(--accent-dim);color:var(--accent)}
+.sec-link .dot{
+  width:14px;height:14px;border-radius:50%;flex-shrink:0;
+  background:var(--surface-3);border:1.5px solid var(--border-strong);
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:9px;color:transparent;font-weight:700;
+}
+.sec-link.complete .dot{background:var(--success);border-color:var(--success);color:#fff}
+.sec-link.complete .dot::before{content:'✓'}
+.sec-link.has-required .dot{border-color:#ef6b6b}
+
+.sum-meta{margin:0 0 14px;padding:12px 14px;background:var(--surface-2);border-radius:var(--radius-md);font-size:12px;color:var(--text-muted)}
+.sum-meta-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0}
+.sum-meta-row b{color:var(--text);font-weight:600;font-size:12.5px;text-align:right;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sum-submit{width:100%}
+
+@media(max-width:1100px){
+  .progress-wrap{margin-bottom:8px}
+  .sum-meta{display:none}
+  .summary-col .section-label{display:none}
+  .summary-card .sum-submit{margin-top:6px}
+}
+
+/* ═══════════════════════════════════════════════
+   4. SECTION LABEL + GLASS CARD
+═══════════════════════════════════════════════ */
+.section-label{font-size:19px;font-weight:700;color:var(--text);margin:var(--section-gap) 0 var(--label-gap);letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.section-label::before{content:'';display:block;width:3px;height:18px;background:var(--accent);border-radius:2px;flex-shrink:0}
+.section-sub{font-size:13px;color:var(--text-muted);margin:0 0 18px 13px}
+
+.glass-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:var(--card-pad);box-shadow:var(--shadow-md)}
+.glass-card + .glass-card{margin-top:18px}
+
+/* ═══════════════════════════════════════════════
+   5. INTRO HERO — glass card with subtle accent gradient
+═══════════════════════════════════════════════ */
+/* Hero is theme-locked: same dark charcoal/accent look in both light and dark modes. */
+.hero{
+  margin-top:32px;padding:30px 32px 28px;
+  border-radius:var(--radius-xl);
+  background:linear-gradient(135deg,rgba(0,164,228,0.14),transparent 60%),#283246;
+  border:1px solid rgba(0,164,228,0.35);
+  box-shadow:0 12px 32px rgba(0,0,0,0.32);
+  position:relative;overflow:hidden;
+}
+.hero::after{
+  content:'';position:absolute;right:-80px;top:-80px;
+  width:280px;height:280px;
+  background:radial-gradient(circle,rgba(0,164,228,0.18),transparent 70%);
+  pointer-events:none;
+}
+.hero h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px;color:#f4f6fa;position:relative;z-index:1}
+.hero p{color:#cdd5e0;font-size:14px;max-width:780px;line-height:1.55;position:relative;z-index:1}
+.hero .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;font-size:12px;position:relative;z-index:1}
+.hero .meta span{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:999px;
+  background:rgba(15,186,142,0.14);
+  border:1px solid rgba(15,186,142,0.4);
+  color:#5fe6b8;font-weight:500;letter-spacing:.01em;
+}
+.hero .meta b{color:#a6f5d2;font-weight:700}
+
+/* ═══════════════════════════════════════════════
+   6. FORMS
+═══════════════════════════════════════════════ */
+.grid{display:grid;gap:14px}
+.g-2{grid-template-columns:1fr 1fr}
+.g-3{grid-template-columns:1fr 1fr 1fr}
+.g-4{grid-template-columns:repeat(4,1fr)}
+.span-2{grid-column:span 2}
+.span-3{grid-column:span 3}
+.span-4{grid-column:span 4}
+@media(max-width:760px){.g-2,.g-3,.g-4{grid-template-columns:1fr}.span-2,.span-3,.span-4{grid-column:auto}}
+
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-label{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.form-label .req{color:#ef6b6b;font-size:14px;line-height:0;font-weight:700}
+html.light .form-label .req{color:#dc4b4b}
+.form-input,.form-select,.form-textarea{
+  height:var(--input-h);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius-md);color:var(--text);font-size:13.5px;font-family:var(--font);
+  padding:0 14px;transition:border-color .15s,background .15s;width:100%;outline:none;appearance:none;
+}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);background:var(--accent-dim)}
+.form-input::placeholder{color:var(--text-muted)}
+.form-textarea{height:auto;min-height:80px;padding:12px 14px;resize:vertical;line-height:1.5}
+.form-select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a8fa8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer;
+}
+.form-select option{background:var(--card-solid);color:var(--text)}
+.form-input.invalid,.form-select.invalid,.form-textarea.invalid{
+  border-color:var(--danger);
+  background:rgba(224,84,84,0.10);
+  border-width:1.5px;
+}
+/* On submit, every invalid field gets `.flash` re-added so the pulse re-runs
+   even when the field was already marked. Strong ring grabs attention. */
+@keyframes flashPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(224,84,84,0.55); }
+  60%  { box-shadow: 0 0 0 10px rgba(224,84,84,0); }
+  100% { box-shadow: 0 0 0 0 rgba(224,84,84,0); }
+}
+.flash.invalid,
+.flash.form-input.invalid, .flash.form-select.invalid, .flash.form-textarea.invalid,
+.flash.yn-group.invalid, .flash.seg-group.invalid,
+.flash.dropzone.invalid, .flash.checkbox-row.invalid,
+.flash.sig-wrap.invalid {
+  animation: flashPulse 0.9s ease-out 0s 3;
+}
+
+/* Bright top banner that appears under the section nav when submit fails. */
+.submit-error-banner{
+  position:sticky; top:0; z-index:150;
+  margin:0 0 18px;
+  padding:14px 18px;
+  background:linear-gradient(90deg, rgba(224,84,84,0.18), rgba(224,84,84,0.06));
+  border:1px solid var(--danger);
+  border-left:4px solid var(--danger);
+  border-radius:var(--radius-md);
+  color:var(--text);
+  font-size:13.5px;
+  font-weight:600;
+  display:none;
+  align-items:center;
+  gap:10px;
+  box-shadow:0 4px 16px rgba(224,84,84,0.18);
+  animation:flashPulse 0.9s ease-out 0s 2;
+}
+.submit-error-banner.show{display:flex}
+.submit-error-banner .icon{
+  flex-shrink:0;
+  width:28px;height:28px;border-radius:50%;
+  background:var(--danger);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:700;
+}
+.submit-error-banner .count{color:var(--danger);font-weight:700}
+.submit-error-banner .scroll-btn{
+  margin-left:auto;
+  padding:6px 12px;border-radius:var(--radius-sm);
+  background:var(--danger);color:#fff;
+  border:none;font-weight:600;font-size:12px;cursor:pointer;
+  font-family:var(--font);
+}
+.submit-error-banner .scroll-btn:hover{filter:brightness(1.08)}
+.form-help{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+.form-error{
+  font-size:11.5px;color:#ef6b6b;margin-top:4px;
+  display:flex;align-items:center;gap:5px;line-height:1.35;
+  animation:errShake .25s ease;
+}
+.form-error::before{content:'⚠';font-size:11px;flex-shrink:0}
+@keyframes errShake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-3px)}
+  75%{transform:translateX(3px)}
+}
+/* Truncate long labels on roomy screens; allow wrapping on mobile so we
+   don't clip headers like "ACCOUNT / TYPE / DATE OPENED". */
+.form-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:900px){.form-label{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3}}
+
+/* iOS Safari zooms into any input whose font-size is < 16px on focus. That's
+   the "weird scroll/zoom" feeling. Bump everything to 16px on mobile. */
+@media(max-width:900px){
+  .form-input, .form-select, .form-textarea, .ref-row textarea.form-input{
+    font-size:16px;
+  }
+}
+
+/* Primary Contacts — role-grouped blocks. Role acts as a mini-subtitle so
+   individual field labels stay short (Name / Phone / Email), which keeps
+   them on one line at every viewport. */
+.contact-block{padding:14px 0;border-top:1px dashed var(--border)}
+.contact-block:first-child{padding-top:0;border-top:0}
+.contact-role{
+  font-size:13px;font-weight:700;color:var(--text);
+  letter-spacing:-.005em;margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;
+}
+.contact-role .req{color:#ef6b6b;font-size:14px;line-height:0;font-weight:700}
+
+/* segmented buttons */
+.seg-group{display:flex;gap:6px;flex-wrap:wrap}
+.seg-btn{
+  flex:1;min-width:110px;height:var(--input-h);
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);
+  color:var(--text-2);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);
+  transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px;
+}
+.seg-btn:hover{background:var(--surface-3);color:var(--text)}
+/* Matches the Yes (selected-yes) green so picks across the whole form look consistent. */
+.seg-btn.selected{background:rgba(15,186,142,.18);border-color:var(--success);color:var(--success);font-weight:700}
+.seg-btn.selected::before{content:'✓';font-size:13px;font-weight:700}
+.seg-btn.invalid{border-color:var(--danger)}
+
+/* yes/no */
+.yn-group{display:flex;gap:6px}
+.yn-btn{
+  flex:1;height:40px;font-size:13px;font-weight:600;
+  border-radius:var(--radius-sm);cursor:pointer;
+  border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-muted);
+  transition:all .15s;font-family:var(--font);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+}
+.yn-btn:hover{background:var(--surface-3);color:var(--text);border-color:var(--border-strong)}
+/* Selected states — both clearly visible. Yes = soft green chip, No = inverted (filled text-color bg with bg-color text). Both get a leading icon for instant recognition. */
+.yn-btn.selected-yes{background:rgba(15,186,142,.18);border-color:var(--success);color:var(--success);font-weight:700}
+.yn-btn.selected-yes::before{content:'✓';font-size:14px;font-weight:700}
+.yn-btn.selected-no{background:var(--text);border-color:var(--text);color:var(--bg);font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.18)}
+.yn-btn.selected-no::before{content:'✕';font-size:13px;font-weight:700}
+.yn-btn.invalid{border-color:var(--danger)}
+
+/* repeater (bank/trade refs) */
+.ref-row{display:grid;grid-template-columns:1.1fr 1fr 1fr 30px;gap:10px;margin-bottom:8px;align-items:start}
+.ref-row .form-input{height:38px}
+@media(max-width:900px){.ref-row{grid-template-columns:1fr;gap:8px;padding:12px 0;border-top:1px dashed var(--border)}.ref-row:first-child{padding-top:0;border-top:0}.ref-row .col-x{justify-self:end}}
+.ref-row textarea.form-input{height:38px;padding:10px 14px;line-height:1.4;min-height:38px;resize:vertical;overflow:hidden}
+@media(max-width:900px){
+  .ref-row textarea.form-input{resize:none;height:auto;min-height:42px}
+}
+.btn-x{width:30px;height:38px;border-radius:var(--radius-sm);background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:1}
+.btn-x:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+.add-row{margin-top:6px}
+
+/* terms scroll */
+.terms-box{
+  max-height:280px;overflow-y:auto;padding:18px 20px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);
+  font-size:12.5px;line-height:1.55;color:var(--text-2);
+}
+.terms-box h4{font-size:13px;font-weight:700;color:var(--text);margin:14px 0 6px}
+.terms-box h4:first-child{margin-top:0}
+.terms-box p{margin-bottom:8px}
+.terms-box ol{margin:0 0 10px 22px}
+.terms-box li{margin-bottom:6px}
+
+.checkbox-row{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);cursor:pointer;transition:all .15s;margin-top:14px}
+.checkbox-row:hover{background:var(--surface-3)}
+.checkbox-row.checked{background:var(--accent-dim);border-color:var(--accent)}
+.checkbox-row.invalid{border-color:var(--danger)}
+.checkbox-row input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;flex-shrink:0;margin-top:2px;cursor:pointer}
+.checkbox-row label{font-size:13px;color:var(--text-2);cursor:pointer;line-height:1.4}
+.checkbox-row.checked label{color:var(--text)}
+
+/* dropzone — drag/drop file uploads */
+.dropzone{
+  position:relative;border:1.5px dashed var(--border-strong);border-radius:var(--radius-md);
+  background:var(--surface-2);padding:22px 18px;cursor:pointer;
+  transition:all .15s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.dropzone:hover{border-color:var(--accent);background:var(--accent-dim)}
+.dropzone.drag-over{border-color:var(--accent);background:var(--accent-dim);transform:scale(1.005)}
+.dropzone.invalid{border-color:var(--danger)}
+.dropzone .dz-icon{
+  width:38px;height:38px;border-radius:50%;background:var(--surface-3);
+  display:flex;align-items:center;justify-content:center;color:var(--accent);
+  font-size:18px;margin-bottom:2px;
+}
+.dropzone .dz-title{font-size:13px;font-weight:600;color:var(--text)}
+.dropzone .dz-sub{font-size:11.5px;color:var(--text-muted)}
+.dropzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.file-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.file-list:empty{display:none}
+.file-chip{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+}
+.file-chip.over-limit{border-color:var(--danger);background:rgba(224,84,84,0.06)}
+.file-chip .ico{
+  width:28px;height:28px;border-radius:6px;background:var(--accent-dim);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;
+}
+.file-chip .meta{flex:1;min-width:0}
+.file-chip .name{font-size:12.5px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-chip .size{font-size:11px;color:var(--text-muted)}
+.file-chip .x{
+  width:24px;height:24px;border-radius:50%;border:none;background:transparent;
+  color:var(--text-muted);cursor:pointer;font-size:14px;flex-shrink:0;line-height:1;
+}
+.file-chip .x:hover{background:var(--danger);color:#fff}
+
+/* signature pad */
+.sig-wrap{position:relative;background:var(--surface-2);border:1px dashed var(--border-strong);border-radius:var(--radius-md);padding:0;height:170px;overflow:hidden}
+.sig-wrap.invalid{border-color:var(--danger)}
+.sig-wrap canvas{width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+.sig-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;pointer-events:none;font-style:italic}
+.sig-actions{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.sig-clear{font-size:12px;color:var(--text-muted);background:transparent;border:none;cursor:pointer;padding:4px 8px}
+.sig-clear:hover{color:var(--text)}
+.sig-line{position:absolute;left:24px;right:24px;bottom:24px;height:1px;background:var(--border-strong);pointer-events:none}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:var(--input-h);padding:0 18px;border-radius:var(--radius-md);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;border:1px solid transparent;transition:all .15s;white-space:nowrap;text-decoration:none}
+.btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.btn-ghost{background:transparent;color:var(--text-muted)}
+.btn-ghost:hover{background:var(--surface-2);color:var(--text)}
+.btn-lg{height:50px;padding:0 26px;font-size:14px;font-weight:700;letter-spacing:.01em}
+.btn-submit{background:var(--success);color:#fff;border-color:var(--success);box-shadow:0 8px 24px rgba(15,186,142,.25)}
+.btn-submit:hover{filter:brightness(1.07);box-shadow:0 10px 28px rgba(15,186,142,.4)}
+
+.submit-row{margin-top:32px;display:flex;justify-content:flex-end;gap:12px;align-items:center}
+.submit-note{font-size:12px;color:var(--text-muted);margin-right:auto;max-width:440px;line-height:1.5}
+
+/* toast */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--card-solid);border:1px solid var(--border-strong);border-radius:var(--radius-md);
+  padding:14px 22px;color:var(--text);font-size:13.5px;box-shadow:var(--shadow-lg);
+  display:flex;gap:10px;align-items:center;opacity:0;pointer-events:none;transition:all .25s;z-index:300;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.success{border-color:var(--success)}
+.toast.error{border-color:var(--danger)}
+
+/* success modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);z-index:400;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.open{display:flex}
+.modal-card{background:var(--card-solid);border:1px solid var(--border-strong);border-radius:var(--radius-xl);max-width:480px;width:100%;padding:36px 32px;text-align:center;box-shadow:var(--shadow-lg)}
+.modal-card .check{width:64px;height:64px;border-radius:50%;background:rgba(15,186,142,.15);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 18px}
+.modal-card h3{font-size:22px;font-weight:700;margin-bottom:10px;letter-spacing:-.01em}
+.modal-card p{color:var(--text-2);font-size:13.5px;margin-bottom:22px;line-height:1.55}
+.modal-card .ref{font-family:var(--mono);font-size:12px;color:var(--text-muted);background:var(--surface-2);padding:8px 14px;border-radius:var(--radius-sm);display:inline-block;margin-bottom:20px;letter-spacing:.04em}
+
+/* footer */
+.app-footer{margin-top:60px;padding:24px 0;border-top:1px solid var(--border);text-align:center;color:var(--text-muted);font-size:12px}
+.app-footer a{color:var(--text-2);text-decoration:none;margin:0 8px}
+
+@media print{#section-nav,.submit-row{display:none}.app-shell{padding:0}body{background:#fff!important}}
+</style>
+</head>
+<body>
+
+<main class="app-shell">
+  <button id="theme-toggle" type="button" aria-label="Toggle light or dark theme" title="Toggle light/dark">
+    <span class="ti" id="theme-icon" aria-hidden="true"></span>
+    <span class="tlabel" id="theme-label">Light</span>
+  </button>
+
+
+  <div class="hero">
+    <h1>Credit Application</h1>
+    <p>Submit this application to request a Net 30 open credit account with MacroAir Technologies, Inc. Required fields are marked with an asterisk. After approval, you'll receive written confirmation of your terms and credit limit.</p>
+    <div class="meta">
+      <span><b>~5 min</b> to complete</span>
+      <span>You'll receive <b>a signed PDF copy</b></span>
+      <span>Reviewed by our <b>Credit Manager</b></span>
+    </div>
+  </div>
+
+  <!-- Before You Begin — preparation checklist -->
+  <div class="glass-card" style="margin-top:18px">
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Before You Begin</div>
+    <p style="font-size:13px;color:var(--text-muted);margin:0 0 10px">To complete the application in one sitting, have the following ready:</p>
+    <ul style="margin:0;padding-left:20px;font-size:13.5px;color:var(--text-2);line-height:1.85">
+      <li>Federal Employer Identification Number (EIN)</li>
+      <li>Bank name, account type, and contact information (at least one)</li>
+      <li>Trade references — at least one, three preferred (firm name, contact, and annual spend)</li>
+      <li>Estimated credit amount you're requesting</li>
+      <li>Key contacts at your organization: VP Finance/Controller, Accounts Payable Manager, and Purchasing Manager</li>
+    </ul>
+  </div>
+
+  <!-- Real <form> wrapper so iOS Safari / Chrome / Edge offer "Fill from
+       saved info" on the address + contact fields. The submit button is
+       type=button so this form never auto-submits; the JS handler runs the
+       actual workflow. onsubmit guard catches stray Enter-key presses. -->
+  <form id="credit-form" autocomplete="on" onsubmit="event.preventDefault();return false;">
+  <div class="layout">
+    <div class="form-col">
+
+      <div class="submit-error-banner" id="submit-error-banner" role="alert" aria-live="polite">
+        <span class="icon">!</span>
+        <span><span class="count" id="submit-error-count">0</span> required field<span id="submit-error-plural">s</span> still need attention. Highlighted in red below.</span>
+        <button type="button" class="scroll-btn" id="submit-error-scroll">Jump to first ↓</button>
+      </div>
+
+  <!-- ────────────────────────────────────────────
+       1) ORGANIZATIONAL INFORMATION
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-1">1. Organizational Information</div>
+
+  <div class="glass-card">
+    <div class="grid g-2">
+      <div class="form-group span-2">
+        <label class="form-label" for="org-name">Organization Name <span class="req">*</span></label>
+        <input class="form-input" id="org-name" name="organization" type="text" autocomplete="organization" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="federal-id">Federal ID (EIN) <span class="req">*</span></label>
+        <input class="form-input" id="federal-id" name="ein" type="text" autocomplete="off" inputmode="numeric" maxlength="10" placeholder="XX-XXXXXXX" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Type of Entity <span class="req">*</span></label>
+        <div class="seg-group" id="entity-type" data-required="true">
+          <button type="button" class="seg-btn" data-val="Corporation">Corporation</button>
+          <button type="button" class="seg-btn" data-val="LLC">LLC</button>
+          <button type="button" class="seg-btn" data-val="Partnership">Partnership</button>
+          <button type="button" class="seg-btn" data-val="Individual">Individual</button>
+        </div>
+      </div>
+
+      <div class="form-group span-2">
+        <label class="form-label" for="addr-1">Street Address <span class="req">*</span></label>
+        <input class="form-input" id="addr-1" name="address-line1" type="text" autocomplete="address-line1" placeholder="Street address" />
+      </div>
+      <div class="form-group span-2">
+        <label class="form-label" for="addr-2">Address Line 2</label>
+        <input class="form-input" id="addr-2" name="address-line2" type="text" autocomplete="address-line2" placeholder="Suite / unit (optional)" />
+      </div>
+    </div>
+
+    <div class="grid g-4" style="margin-top:14px">
+      <div class="form-group">
+        <label class="form-label" for="city">City <span class="req">*</span></label>
+        <input class="form-input" id="city" name="city" type="text" autocomplete="address-level2" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="county">County <span class="req">*</span></label>
+        <input class="form-input" id="county" name="county" type="text" autocomplete="address-level3" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="state">State <span class="req">*</span></label>
+        <select class="form-select" id="state" name="state" autocomplete="address-level1"><option value="">Select…</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="zip">Zip <span class="req">*</span></label>
+        <input class="form-input" id="zip" name="postal-code" type="text" inputmode="numeric" maxlength="10" autocomplete="postal-code" />
+      </div>
+    </div>
+
+    <div class="grid g-3" style="margin-top:14px">
+      <div class="form-group">
+        <label class="form-label" for="biz-type">Type of Business</label>
+        <input class="form-input" id="biz-type" name="biz-type" type="text" autocomplete="off" placeholder="e.g. Mechanical Contractor (optional)" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="employees">No. Employees</label>
+        <input class="form-input" id="employees" name="employees" type="text" maxlength="7" autocomplete="off" inputmode="numeric" placeholder="Optional" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="year-opened">Year Opened <span class="req">*</span></label>
+        <input class="form-input" id="year-opened" name="year-opened" type="text" maxlength="4" autocomplete="off" inputmode="numeric" placeholder="YYYY" />
+      </div>
+    </div>
+
+    <div class="grid g-3" style="margin-top:14px">
+      <div class="form-group">
+        <label class="form-label" for="annual-revenue">Annual Revenue (USD)</label>
+        <input class="form-input" id="annual-revenue" name="annual-revenue" type="text" inputmode="decimal" autocomplete="off" placeholder="$ (optional)" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Has co. ever filed bankruptcy? <span class="req">*</span></label>
+        <div class="yn-group" id="bankruptcy" data-required="true">
+          <button type="button" class="yn-btn" data-val="No">No</button>
+          <button type="button" class="yn-btn" data-val="Yes">Yes</button>
+        </div>
+      </div>
+      <div class="form-group" id="bankruptcy-detail-wrap" style="display:none">
+        <label class="form-label" for="bankruptcy-detail">Bankruptcy Details</label>
+        <input class="form-input" id="bankruptcy-detail" name="bankruptcy-detail" type="text" autocomplete="off" placeholder="Type, year, status" />
+      </div>
+    </div>
+
+    <div class="grid g-3" style="margin-top:14px">
+      <div class="form-group">
+        <label class="form-label" for="phone">Phone <span class="req">*</span></label>
+        <input class="form-input" id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fax">Fax</label>
+        <input class="form-input" id="fax" name="fax" type="tel" autocomplete="off" inputmode="tel" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="website">Web Site <span class="req">*</span></label>
+        <input class="form-input" id="website" name="url" type="url" autocomplete="url" inputmode="url" placeholder="https://" />
+      </div>
+    </div>
+
+    <div class="grid g-2" style="margin-top:14px">
+      <div class="form-group">
+        <label class="form-label" for="duns">DUNS Number</label>
+        <input class="form-input" id="duns" name="duns" type="text" autocomplete="off" inputmode="numeric" maxlength="9" placeholder="9-digit D-U-N-S (optional)" />
+        <div class="form-help">Optional — if you don't have one, leave blank. DUNS records exist for most US businesses regardless.</div>
+      </div>
+    </div>
+
+    <div class="grid g-2" style="margin-top:14px">
+      <div class="form-group">
+        <label class="form-label" for="sales-rep">MacroAir Sales Representative <span class="req">*</span></label>
+        <input class="form-input" id="sales-rep" name="sales-rep" type="text" autocomplete="off" data-required="true" placeholder="Representative name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="sales-order">Most Recent Sales Order #</label>
+        <input class="form-input" id="sales-order" name="sales-order" type="text" autocomplete="off" placeholder="Order # (optional)" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       2) PRIMARY CONTACTS
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-2">2. Primary Contacts</div>
+  <div class="section-sub">At minimum, please provide accounts payable and purchasing contacts.</div>
+
+  <div class="glass-card">
+    <div id="contacts-rows">
+      <!-- VP Finance / Controller -->
+      <div class="contact-block" data-contact="VP Finance / Controller">
+        <div class="contact-role">VP Finance / Controller <span class="req">*</span></div>
+        <div class="grid g-3">
+          <div class="form-group">
+            <label class="form-label">Name <span class="req">*</span></label>
+            <input class="form-input" data-field="name" name="vp-name" type="text" autocomplete="section-vpfin name" data-required="true" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone / Ext. <span class="req">*</span></label>
+            <input class="form-input" data-field="phone" name="vp-phone" type="tel" inputmode="tel" autocomplete="section-vpfin tel" data-required="true" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email <span class="req">*</span></label>
+            <input class="form-input" data-field="email" name="vp-email" type="email" inputmode="email" autocomplete="section-vpfin email" data-required="true" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Mgr Accounts Payable -->
+      <div class="contact-block" data-contact="Mgr Accounts Payable">
+        <div class="contact-role">Mgr Accounts Payable <span class="req">*</span></div>
+        <div class="grid g-3">
+          <div class="form-group">
+            <label class="form-label">Name <span class="req">*</span></label>
+            <input class="form-input" data-field="name" name="ap-name" type="text" autocomplete="section-ap name" data-required="true" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone / Ext. <span class="req">*</span></label>
+            <input class="form-input" data-field="phone" name="ap-phone" type="tel" inputmode="tel" autocomplete="section-ap tel" data-required="true" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email <span class="req">*</span></label>
+            <input class="form-input" data-field="email" name="ap-email" type="email" inputmode="email" autocomplete="section-ap email" data-required="true" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchasing Manager -->
+      <div class="contact-block" data-contact="Purchasing Manager">
+        <div class="contact-role">Purchasing Manager <span class="req">*</span></div>
+        <div class="grid g-3">
+          <div class="form-group">
+            <label class="form-label">Name <span class="req">*</span></label>
+            <input class="form-input" data-field="name" name="po-name" type="text" autocomplete="section-purch name" data-required="true" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone / Ext. <span class="req">*</span></label>
+            <input class="form-input" data-field="phone" name="po-phone" type="tel" inputmode="tel" autocomplete="section-purch tel" data-required="true" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email <span class="req">*</span></label>
+            <input class="form-input" data-field="email" name="po-email" type="email" inputmode="email" autocomplete="section-purch email" data-required="true" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       3) PURCHASE ORDER
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-3">3. Purchase Order</div>
+
+  <div class="glass-card">
+    <div class="grid g-2">
+      <div class="form-group">
+        <label class="form-label">Is a purchase order required? <span class="req">*</span></label>
+        <div class="yn-group" id="po-required" data-required="true">
+          <button type="button" class="yn-btn" data-val="Yes">Yes</button>
+          <button type="button" class="yn-btn" data-val="No">No</button>
+        </div>
+      </div>
+      <div class="form-group" id="po-instructions-wrap" style="display:none">
+        <label class="form-label" for="po-instructions">PO Submission Instructions</label>
+        <input class="form-input" id="po-instructions" name="po-instructions" type="text" autocomplete="off" placeholder="Email / portal / format" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       4) BANK REFERENCES
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-4">4. Bank References</div>
+  <div class="section-sub">At least one bank reference is required.</div>
+
+  <div class="glass-card">
+    <div id="bank-refs"></div>
+    <button type="button" class="btn btn-ghost btn-sm add-row" id="add-bank">＋ Add another bank reference</button>
+
+    <div class="checkbox-row" id="bank-override-row" style="margin-top:16px">
+      <input type="checkbox" id="bank-override" />
+      <label for="bank-override">I'm attaching bank references on a <b>separate sheet</b> in Documents below — skip the required fields above.</label>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       5) TRADE REFERENCES
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-5">5. Trade References</div>
+  <div class="section-sub">At least one trade reference is required (three preferred).</div>
+
+  <div class="glass-card">
+    <div id="trade-refs"></div>
+    <button type="button" class="btn btn-ghost btn-sm add-row" id="add-trade">＋ Add another trade reference</button>
+
+    <div class="checkbox-row" id="trade-override-row" style="margin-top:16px">
+      <input type="checkbox" id="trade-override" />
+      <label for="trade-override">I'm attaching trade references on a <b>separate sheet</b> in Documents below — skip the required fields above.</label>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       6) RESALE / TAX EXEMPT
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-6">6. Resale / Sales Tax Exemption</div>
+
+  <div class="glass-card">
+    <div class="grid g-2">
+      <div class="form-group">
+        <label class="form-label">Is the company exempt from paying sales tax? <span class="req">*</span></label>
+        <div class="yn-group" id="tax-exempt" data-required="true">
+          <button type="button" class="yn-btn" data-val="No">No</button>
+          <button type="button" class="yn-btn" data-val="Yes">Yes</button>
+        </div>
+      </div>
+    </div>
+    <div id="tax-exempt-upload" style="display:none;margin-top:14px">
+      <label class="dropzone" data-bucket="exemption">
+        <div class="dz-icon">📎</div>
+        <div class="dz-title">Attach your resale / exemption certificate <span class="req" style="color:#ef6b6b;font-weight:700">*</span></div>
+        <div class="dz-sub">Required when claiming tax exemption · PDF, PNG, or JPG · up to 8 MB · click or drag &amp; drop</div>
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg" multiple />
+      </label>
+      <div class="file-list" data-bucket="exemption"></div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       7) CREDIT REQUEST
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-7">7. Credit Request</div>
+
+  <div class="glass-card">
+    <div class="grid g-2">
+      <div class="form-group">
+        <label class="form-label" for="credit-amount">Net 30 Open Credit Requested (USD) <span class="req">*</span></label>
+        <input class="form-input" id="credit-amount" name="credit-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="$" />
+        <div class="form-help">Open credit account is not active until both approved by our Credit Manager and written notification of the amount and payment terms are received by Applicant.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       8) SUPPORTING DOCUMENTS
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-docs">8. Supporting Documents</div>
+  <div class="section-sub">Optional — speeds up review. W-9, financial statements, certificate of insurance, articles of incorporation, etc.</div>
+
+  <div class="glass-card">
+    <label class="dropzone" data-bucket="supporting">
+      <div class="dz-icon">📎</div>
+      <div class="dz-title">Drop supporting documents here</div>
+      <div class="dz-sub">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG · up to 8 MB each · click or drag &amp; drop · multiple files OK</div>
+      <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" multiple />
+    </label>
+    <div class="file-list" data-bucket="supporting"></div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       9) TERMS & CONDITIONS
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-terms">9. Terms &amp; Conditions</div>
+
+  <div class="glass-card">
+    <div class="terms-box" id="terms-box">
+      <h4>Payment Terms</h4>
+      <p>Payment terms are FOB MacroAir facility (FOB Origin), with title and risk of loss transferring to Buyer upon shipment, unless otherwise specified in writing. All invoices are due Net 30 from the invoice date unless otherwise approved in writing.</p>
+      <p>If a credit card is used for payment, Buyer agrees to pay a 3.0% transaction fee (based on the gross payment amount).</p>
+      <p>Buyer is responsible for collecting payment from its customers.</p>
+      <p>Past due balances shall accrue a finance charge of 1.5% per month (or the maximum rate permitted under the Texas Finance Code), from the invoice date until paid in full.</p>
+
+      <h4>Credit Authorization</h4>
+      <p>By submitting this application, Buyer authorizes MacroAir Technologies, Inc. to obtain and verify credit information, including banking and trade references provided.</p>
+
+      <h4>Financial Statements</h4>
+      <p>MacroAir reserves the right to request financial statements at its discretion.</p>
+
+      <h4>Additional Terms and Conditions</h4>
+      <ol>
+        <li>All invoices and sales are subject to these Terms and Conditions, which may be modified only in a written document signed by MacroAir. Any additional or conflicting terms contained in Buyer's purchase order, acknowledgment, or other documents are hereby rejected and shall not be binding unless expressly agreed to in writing by MacroAir.</li>
+        <li>Product warranties are governed solely by MacroAir's published warranty policy available on MacroAir's website or as otherwise provided in writing. All warranty obligations are expressly conditioned upon Buyer's payment in full of all amounts due, including any applicable fees or finance charges. Failure to timely pay shall suspend warranty coverage for the affected products, and the warranty period shall continue to run during any such suspension.</li>
+        <li>For Buyers located outside the United States, payment must be made by wire transfer unless otherwise agreed in writing. Buyer is responsible for all bank and transaction fees associated with such transfers.</li>
+        <li>Unless otherwise agreed in writing, all shipments are FOB Origin (MacroAir facility). Title and risk of loss pass to Buyer upon delivery to the carrier. Buyer is responsible for all freight, insurance, storage, handling, demurrage, and similar charges.</li>
+        <li>MacroAir shall not be liable for any delay or failure in performance caused by events beyond its reasonable control, including but not limited to acts of God, war, terrorism, governmental actions, labor disputes, supply shortages, transportation failures, or natural disasters.</li>
+        <li>Except as expressly provided in writing, MacroAir disclaims all warranties, express or implied, including any implied warranties of merchantability or fitness for a particular purpose.</li>
+        <li>MacroAir's liability for defective goods shall be limited, at its option, to repair, replacement, or refund of the purchase price of the affected goods. MacroAir shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including lost profits or business interruption.</li>
+        <li>If credit is extended, MacroAir reserves the right to suspend or revoke credit at any time if Buyer fails to pay when due or if MacroAir reasonably determines that Buyer's financial condition has materially changed. In such event, MacroAir may require advance payment before further shipments.</li>
+        <li>All disputes arising out of or relating to this Agreement shall be resolved by binding arbitration administered by the American Arbitration Association. The arbitration shall take place in Dallas, Texas, unless otherwise agreed in writing. Judgment on any award may be entered in any court of competent jurisdiction.</li>
+        <li>This Agreement may not be amended, modified, or waived except in a written document signed by an authorized representative of MacroAir.</li>
+      </ol>
+      <p><i>This Agreement shall be governed by and construed in accordance with the laws of the State of Texas, without regard to conflict of law principles.</i></p>
+    </div>
+
+    <div class="checkbox-row" id="agree-row">
+      <input type="checkbox" id="agree" />
+      <label for="agree">I have read and agree to the Payment Terms, Credit Authorization, and Additional Terms &amp; Conditions above. I certify that the information provided is true and complete to the best of my knowledge.</label>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       9) SIGNATURE
+  ──────────────────────────────────────────── -->
+  <div class="section-label" id="sec-sign">10. Signature</div>
+
+  <div class="glass-card">
+    <div class="grid g-2" style="margin-bottom:16px">
+      <div class="form-group">
+        <label class="form-label" for="sig-name">Printed Name <span class="req">*</span></label>
+        <input class="form-input" id="sig-name" name="signer-name" type="text" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="sig-title">Title <span class="req">*</span></label>
+        <input class="form-input" id="sig-title" name="signer-title" type="text" autocomplete="organization-title" placeholder="e.g. CFO, Owner, Controller" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="sig-email">Signer Email <span class="req">*</span></label>
+        <input class="form-input" id="sig-email" name="signer-email" type="email" inputmode="email" autocomplete="email" placeholder="A copy of the signed PDF will be sent here" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="sig-date">Date</label>
+        <input class="form-input" id="sig-date" name="signer-date" type="text" autocomplete="off" readonly />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Signature <span class="req">*</span></label>
+      <div class="sig-wrap" id="sig-wrap">
+        <canvas id="sig-canvas"></canvas>
+        <div class="sig-line"></div>
+        <div class="sig-placeholder" id="sig-placeholder">Click and drag (or use your finger on touch) to sign</div>
+      </div>
+      <div class="sig-actions">
+        <span class="form-help">By signing above, you are providing an electronic signature with the same legal effect as a handwritten signature.</span>
+        <button type="button" class="sig-clear" id="sig-clear">Clear</button>
+      </div>
+    </div>
+  </div>
+
+    </div><!-- /.form-col -->
+
+    <aside class="summary-col" aria-label="Application progress">
+      <div class="section-label">Application Progress</div>
+      <div class="summary-card">
+        <div class="progress-wrap">
+          <div class="progress-row"><span>Required fields</span><b><span id="prog-num">0</span>%</b></div>
+          <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+        </div>
+
+        <div class="sec-list" id="sec-list"></div>
+
+        <div class="sum-meta" id="sum-meta">
+          <div class="sum-meta-row"><span>Organization</span><b id="meta-org">—</b></div>
+          <div class="sum-meta-row"><span>Credit Requested</span><b id="meta-credit">—</b></div>
+          <div class="sum-meta-row"><span>Signer</span><b id="meta-signer">—</b></div>
+        </div>
+
+        <button type="button" class="btn btn-lg btn-submit sum-submit" id="submit-btn">Submit Application →</button>
+        <p class="submit-note" style="font-size:11.5px;color:var(--text-muted);margin-top:10px;line-height:1.5">Sent to <b>ap@</b> &amp; <b>ar@macroairfans.com</b>, plus a copy to the signer.</p>
+      </div>
+    </aside>
+  </div><!-- /.layout -->
+  </form>
+
+  <div class="app-footer">
+    MacroAir Technologies, Inc. &nbsp;·&nbsp; 866.668.3247 &nbsp;·&nbsp; <a href="https://www.macroairfans.com">www.macroairfans.com</a><br/>
+    © <span id="copy-year"></span> MacroAir Technologies, Inc. — all rights reserved.
+  </div>
+
+</main>
+
+<div class="toast" id="toast"><span id="toast-msg"></span></div>
+
+<div class="modal-backdrop" id="success-modal">
+  <div class="modal-card">
+    <div class="check">✓</div>
+    <h3>Application submitted</h3>
+    <p>Thanks — we've received your credit application. A copy of the signed PDF has been sent to your email along with our AP and AR teams. Our Credit Manager will review and follow up shortly.</p>
+    <div class="ref" id="modal-ref"></div>
+    <button class="btn btn-primary" onclick="document.getElementById('success-modal').classList.remove('open')">Done</button>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   CONFIG
+═════════════════════════════════════════════════════════════════ */
+const WORKER_URL = 'https://credit-application.tford-2c1.workers.dev/';
+/* Must match FORM_TOKEN in worker.js. Not a secret (it's in page source) —
+   it's an abuse guard against blind scanning of the worker URL. */
+const FORM_TOKEN = 'ma-credit-2026-Kq7xT9mWz4pR';
+
+const MA_WORDMARK_DATAURL = "data:image/png;base64,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caF3wuw5jjWpCCGepFS0RCr7s+z8Xp+e3zAOXBjgu8fUTAeMdfq5yl6vTPzvoS7+LcFB8ZJ/Z2s6ndTwQq1c15pOTeDpOOzY4TX/OjVUYP5wH+RVWiouaTEzl78kndd6E1vdydrpQjCrDWkXq2ZfjUPlxmuuTccPjtmvstSaK3CYiUFIJWGxCRfqZ64ktL2aS/2TanWybiac8+cpE10NNwzcJ3kUxfVrhNI/xPEGBWwTK4R5jlDx57SJLRf6Fqns3p7xgtnHbAZyXac+PZPOCC8kuPHB76Tq/s18weetT801zDyBWeFC7xPSbBPStLnQs64U11bPcaE3DLvh3R+l1GONiU8T0qwU0lwnld2eGoru9wDfSa8cVRSvTk0GyNh6+qAC/w7mb3rN2rv6PE1XMGBwzZ1QSxfyPTnXL4ScYhy/LEKh/nlm7Xr4fuZ9b/1I2xr89xboPxxr0mk0Gscopf5cmeizSkcxF/qOngHujZHeQz2Mn954sqCofveYWj1zwJjqnrtNpaIZIcxZkLZw0dTUfXD8Uqncfn/mJdczvWMP8xP34pv3Mr91B5va9CgceuxYduOxzEuuZWrb3nn94EJQ+sxrvh+HXTRQRi3aM8f81qwTBbOzjG+ZY6tar8ChcuM1BbO73LXVwGclDRxmYgDzAvU/4b+uxRg7CscbZzqdzlG4D1wIvp9OZ3j3Xq/X6w9MDbDQb5Wy9ulQ6POE0L5UNubCXCKEuZxLfdn+EtJczoVeJ4SJhDIRl8ZwaZZzqZdzrv8jFOprQqgzhbD/pJQ5w9ra20Np/14I8wop5XNhNioIokfDLl6upNTqkz1rHzGq4xYMaRRFT+JcvUGa6NNcqP/iUsdK2UuF1NcKqW/kUje50AkXJoG3O1zoXwmpr4KC/qHQHiw+U8qcJox5ab1efwiOMSgq9foDrW08Bn9n/UopdTKMHzB3OBZxIL7vP0RK+2IO40KZr3GhfaWjdVyYq4XUv+LC3JqNJ5MIqW/nQv9aCH2NUtF6LjSXynxDmfgMrvXLvTg+AX/+QAGTFrafzSp3Pot5rWc6V7j12WzqzifisGMLb53CvPZz5vWDC4ldz0k/Py/i5vuyoPUYJrad5ETV5ORUUze5f3jzNp/gtK1q28lM3V7OQlCCIIhBIIS4LzyYhGH4SNCUlI8CIxOG4XGwyxv+fYI4HPCABePH87wTYDyFtdojOecnXmDMA5YtW3Ys/n2CIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIArh/wMS30Gv+AOkMAAAAABJRU5ErkJggg==";
+const MA_WORDMARK_ASPECT = 1801/346;
+
+/* ════════════════════════════════════════════════════════════════
+   THEME
+═════════════════════════════════════════════════════════════════ */
+(function initTheme(){
+  // Click to switch — show the icon for the current mode (so user knows what's on)
+  function paint(isLight){
+    document.documentElement.classList.toggle('light', isLight);
+    document.getElementById('theme-icon').textContent = isLight ? '☀️' : '🌙';
+    document.getElementById('theme-label').textContent = isLight ? 'Light' : 'Dark';
+  }
+  const saved = localStorage.getItem('ma-theme') || 'light';
+  paint(saved === 'light');
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = !document.documentElement.classList.contains('light');
+    paint(next);
+    localStorage.setItem('ma-theme', next ? 'light' : 'dark');
+  });
+})();
+
+document.getElementById('copy-year').textContent = new Date().getFullYear();
+
+/* ════════════════════════════════════════════════════════════════
+   SUMMARY PANEL — section list, progress bar, live meta values,
+   click-to-scroll, scroll-spy active section
+═════════════════════════════════════════════════════════════════ */
+const SECTIONS = [
+  // CFO audit: year-opened required, employees + DUNS optional.
+  { id:'sec-1',     label:'Organization',         required:['org-name','federal-id','addr-1','city','state','zip','year-opened','phone','website'], groups:['entity-type','bankruptcy'] },
+  { id:'sec-2',     label:'Primary Contacts',     contacts:true },
+  { id:'sec-3',     label:'Purchase Order',       groups:['po-required'] },
+  // refs sections can be satisfied by ticking the "separate sheet" override.
+  { id:'sec-4',     label:'Bank References',      refs:'bank-refs',  overrideCk:'bank-override'  },
+  { id:'sec-5',     label:'Trade References',     refs:'trade-refs', overrideCk:'trade-override' },
+  // tax-exempt = Yes also requires an exemption file in the dropzone.
+  { id:'sec-6',     label:'Tax Exemption',        groups:['tax-exempt'], exemptFile:true },
+  { id:'sec-7',     label:'Credit Request',       required:['credit-amount'] },
+  { id:'sec-docs',  label:'Supporting Documents', optional:true },
+  { id:'sec-terms', label:'Terms & Conditions',   agree:true },
+  { id:'sec-sign',  label:'Sign & Submit',        required:['sig-name','sig-title','sig-email'], signature:true }
+];
+
+(function initSummary(){
+  const list = document.getElementById('sec-list');
+  SECTIONS.forEach((s, i) => {
+    const a = document.createElement('button');
+    a.type = 'button';
+    a.className = 'sec-link';
+    a.dataset.idx = i;
+    a.dataset.target = s.id;
+    a.innerHTML = `<span class="dot"></span><span>${s.label}</span>`;
+    a.addEventListener('click', () => {
+      const t = document.getElementById(s.id);
+      if (!t) return;
+      const top = t.getBoundingClientRect().top + window.pageYOffset - 16;
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+    list.appendChild(a);
+  });
+
+  // ── Completion check per section ──────────────────────────────
+  function isFilled(el){ return el && String(el.value || '').trim().length > 0; }
+  function sectionComplete(s){
+    if (s.optional) return true;
+    if (s.required) {
+      for (const id of s.required) if (!isFilled(document.getElementById(id))) return false;
+    }
+    if (s.groups) {
+      for (const g of s.groups) if (!document.getElementById(g).dataset.value) return false;
+    }
+    if (s.contacts) {
+      // AP + Purchasing rows are required (skip first/VP row)
+      const required = document.querySelectorAll('[data-contact] [data-required]');
+      for (const el of required) if (!isFilled(el)) return false;
+    }
+    if (s.refs) {
+      // The CFO override checkbox can satisfy this section in lieu of typing.
+      const override = s.overrideCk && document.getElementById(s.overrideCk);
+      if (override && override.checked) return true;
+      const first = document.querySelector(`#${s.refs} .ref-row:first-child`);
+      if (!first) return false;
+      const reqs = first.querySelectorAll('[data-required]');
+      for (const el of reqs) if (!isFilled(el)) return false;
+    }
+    if (s.exemptFile) {
+      // Only required when tax-exempt = Yes.
+      const v = document.getElementById('tax-exempt').dataset.value;
+      if (v === 'Yes' && fileBuckets.exemption.length === 0) return false;
+    }
+    if (s.agree) {
+      if (!document.getElementById('agree').checked) return false;
+    }
+    if (s.signature) {
+      if (typeof sigEmpty !== 'undefined' && sigEmpty) return false;
+    }
+    return true;
+  }
+
+  // ── Active section based on scroll position ───────────────────
+  function activeIdx(){
+    const threshold = 120;
+    let best = 0;
+    for (let i = 0; i < SECTIONS.length; i++){
+      const t = document.getElementById(SECTIONS[i].id);
+      if (!t) continue;
+      const top = t.getBoundingClientRect().top;
+      if (top - threshold <= 0) best = i; else break;
+    }
+    return best;
+  }
+
+  function refresh(){
+    const active = activeIdx();
+    let completeCount = 0;
+    Array.from(list.children).forEach((node, i) => {
+      const s = SECTIONS[i];
+      const done = sectionComplete(s);
+      node.classList.toggle('complete', done);
+      node.classList.toggle('active', i === active);
+      if (done && !s.optional) completeCount++;
+    });
+    const total = SECTIONS.filter(s => !s.optional).length;
+    const pct = Math.round((completeCount / total) * 100);
+    document.getElementById('prog-num').textContent = pct;
+    document.getElementById('prog-fill').style.width = pct + '%';
+
+    // Live meta values
+    document.getElementById('meta-org').textContent    = (document.getElementById('org-name').value || '—').trim() || '—';
+    const credit = document.getElementById('credit-amount').value.trim();
+    document.getElementById('meta-credit').textContent = credit ? fmtMoney(credit) : '—';
+    const sigName  = document.getElementById('sig-name').value.trim();
+    const sigTitle = document.getElementById('sig-title').value.trim();
+    document.getElementById('meta-signer').textContent = sigName ? `${sigName}${sigTitle ? ', ' + sigTitle : ''}` : '—';
+  }
+
+  // tiny money formatter shared with PDF (defined later) — local copy
+  function fmtMoney(s){
+    const n = String(s).replace(/[^0-9.\-]/g,'');
+    if (!n) return s;
+    const num = Number(n);
+    if (isNaN(num)) return s;
+    return num.toLocaleString('en-US', { style:'currency', currency:'USD', maximumFractionDigits:0 });
+  }
+
+  // bind to all inputs + buttons that affect completion
+  document.addEventListener('input',  refresh);
+  document.addEventListener('change', refresh);
+  document.addEventListener('click',  () => setTimeout(refresh, 30)); // catch yn/seg/agree/sig
+  let raf = 0;
+  window.addEventListener('scroll', () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { refresh(); raf = 0; });
+  }, { passive: true });
+  window.addEventListener('resize', refresh);
+  setTimeout(refresh, 50);
+})();
+
+/* ════════════════════════════════════════════════════════════════
+   FILE DROPZONES — drag/drop + click + paste
+═════════════════════════════════════════════════════════════════ */
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8 MB
+const fileBuckets = { exemption: [], supporting: [] };
+
+function bytesToReadable(n){
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(0) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+function fileExt(name){ const i = name.lastIndexOf('.'); return i < 0 ? '' : name.slice(i+1).toUpperCase().slice(0,4); }
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = String(r.result || '');
+      const c = s.indexOf(',');
+      resolve(c >= 0 ? s.slice(c+1) : s);
+    };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+function renderFileList(bucket){
+  const list = document.querySelector(`.file-list[data-bucket="${bucket}"]`);
+  list.innerHTML = '';
+  fileBuckets[bucket].forEach((f, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip' + (f.size > MAX_FILE_SIZE ? ' over-limit' : '');
+    chip.innerHTML = `
+      <div class="ico">${fileExt(f.name) || 'FILE'}</div>
+      <div class="meta"><div class="name">${f.name.replace(/</g,'&lt;')}</div><div class="size">${bytesToReadable(f.size)}${f.size > MAX_FILE_SIZE ? ' · too large' : ''}</div></div>
+      <button type="button" class="x" aria-label="Remove">×</button>
+    `;
+    chip.querySelector('.x').addEventListener('click', () => {
+      fileBuckets[bucket].splice(idx, 1);
+      renderFileList(bucket);
+    });
+    list.appendChild(chip);
+  });
+}
+function addFiles(bucket, files){
+  for (const f of files) fileBuckets[bucket].push(f);
+  renderFileList(bucket);
+  const dz = document.querySelector(`.dropzone[data-bucket="${bucket}"]`);
+  if (dz) dz.classList.remove('invalid');
+}
+document.querySelectorAll('.dropzone').forEach(dz => {
+  const bucket = dz.dataset.bucket;
+  const input = dz.querySelector('input[type=file]');
+  input.addEventListener('change', () => {
+    if (input.files && input.files.length) addFiles(bucket, Array.from(input.files));
+    input.value = '';
+  });
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.add('drag-over');
+  }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag-over');
+  }));
+  dz.addEventListener('drop', e => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length) addFiles(bucket, Array.from(files));
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   STATE DROPDOWN
+═════════════════════════════════════════════════════════════════ */
+const STATES = ['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','District of Columbia','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming','— International —'];
+(function(){
+  const sel = document.getElementById('state');
+  STATES.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+})();
+
+/* date stamp */
+(function(){
+  const d = new Date();
+  document.getElementById('sig-date').value = d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+})();
+
+/* ════════════════════════════════════════════════════════════════
+   SEGMENTED & YES/NO BUTTON GROUPS
+═════════════════════════════════════════════════════════════════ */
+function bindToggleGroup(id, kind /* 'seg' | 'yn' */){
+  const root = document.getElementById(id);
+  root.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      root.querySelectorAll('button').forEach(x => {
+        x.classList.remove('selected', 'selected-yes', 'selected-no');
+      });
+      if (kind === 'seg') b.classList.add('selected');
+      else b.classList.add(b.dataset.val === 'Yes' ? 'selected-yes' : 'selected-no');
+      root.classList.remove('invalid');
+      root.dataset.value = b.dataset.val;
+      // conditional reveals
+      if (id === 'bankruptcy') {
+        document.getElementById('bankruptcy-detail-wrap').style.display = b.dataset.val === 'Yes' ? '' : 'none';
+      } else if (id === 'po-required') {
+        document.getElementById('po-instructions-wrap').style.display = b.dataset.val === 'Yes' ? '' : 'none';
+      } else if (id === 'tax-exempt') {
+        document.getElementById('tax-exempt-upload').style.display = b.dataset.val === 'Yes' ? '' : 'none';
+      }
+    });
+  });
+}
+bindToggleGroup('entity-type', 'seg');
+bindToggleGroup('bankruptcy', 'yn');
+bindToggleGroup('po-required', 'yn');
+bindToggleGroup('tax-exempt', 'yn');
+
+/* ════════════════════════════════════════════════════════════════
+   REPEATER ROWS — Bank / Trade refs
+═════════════════════════════════════════════════════════════════ */
+function makeRefRow(kind, isFirst){
+  const div = document.createElement('div');
+  div.className = 'ref-row';
+  const reqAttr = isFirst ? 'data-required="true"' : '';
+  const reqStar = isFirst ? '<span class="req">*</span>' : '';
+  if (kind === 'bank') {
+    div.innerHTML = `
+      <div class="form-group"><label class="form-label">Bank Name &amp; Address ${reqStar}</label><textarea class="form-input" data-field="institution" rows="1" autocomplete="off" ${reqAttr}></textarea></div>
+      <div class="form-group"><label class="form-label">Account / Type / Date Opened ${reqStar}</label><input class="form-input" data-field="account" type="text" autocomplete="off" ${reqAttr} /></div>
+      <div class="form-group"><label class="form-label">Contact &amp; Phone ${reqStar}</label><input class="form-input" data-field="contact" type="text" autocomplete="off" ${reqAttr} /></div>
+      <div class="form-group col-x"><label class="form-label">&nbsp;</label><button type="button" class="btn-x" aria-label="Remove">×</button></div>
+    `;
+  } else {
+    div.innerHTML = `
+      <div class="form-group"><label class="form-label">Firm Name &amp; Address ${reqStar}</label><textarea class="form-input" data-field="institution" rows="1" autocomplete="off" ${reqAttr}></textarea></div>
+      <div class="form-group"><label class="form-label">Product / Service (annual $) ${reqStar}</label><input class="form-input" data-field="account" type="text" autocomplete="off" ${reqAttr} /></div>
+      <div class="form-group"><label class="form-label">Contact &amp; Phone ${reqStar}</label><input class="form-input" data-field="contact" type="text" autocomplete="off" ${reqAttr} /></div>
+      <div class="form-group col-x"><label class="form-label">&nbsp;</label><button type="button" class="btn-x" aria-label="Remove">×</button></div>
+    `;
+  }
+  div.querySelector('.btn-x').addEventListener('click', () => {
+    if (isFirst) { showToast('At least one ' + kind + ' reference is required.', 'error'); return; }
+    div.remove();
+  });
+  return div;
+}
+const bankRoot = document.getElementById('bank-refs');
+const tradeRoot = document.getElementById('trade-refs');
+bankRoot.appendChild(makeRefRow('bank', true));
+bankRoot.appendChild(makeRefRow('bank', false));
+tradeRoot.appendChild(makeRefRow('trade', true));
+tradeRoot.appendChild(makeRefRow('trade', false));
+tradeRoot.appendChild(makeRefRow('trade', false));
+document.getElementById('add-bank').addEventListener('click', () => bankRoot.appendChild(makeRefRow('bank', false)));
+document.getElementById('add-trade').addEventListener('click', () => tradeRoot.appendChild(makeRefRow('trade', false)));
+
+/* ════════════════════════════════════════════════════════════════
+   SIGNATURE PAD
+═════════════════════════════════════════════════════════════════ */
+const sigCanvas = document.getElementById('sig-canvas');
+const sigCtx = sigCanvas.getContext('2d');
+const sigPlaceholder = document.getElementById('sig-placeholder');
+let sigDrawing = false, sigLastPt = null, sigEmpty = true;
+
+function sizeSigCanvas(){
+  const r = sigCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  sigCanvas.width = r.width * dpr;
+  sigCanvas.height = r.height * dpr;
+  sigCtx.scale(dpr, dpr);
+  sigCtx.lineCap = 'round';
+  sigCtx.lineJoin = 'round';
+  sigCtx.lineWidth = 2.2;
+  sigCtx.strokeStyle = document.documentElement.classList.contains('light') ? '#0d1420' : '#f0f4fa';
+}
+sizeSigCanvas();
+addEventListener('resize', () => { const data = sigEmpty ? null : sigCanvas.toDataURL(); sizeSigCanvas(); if (data) { const i = new Image(); i.onload = () => sigCtx.drawImage(i,0,0,sigCanvas.getBoundingClientRect().width,sigCanvas.getBoundingClientRect().height); i.src = data; } });
+
+function ptFromEv(e){
+  const r = sigCanvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+function startDraw(e){
+  e.preventDefault();
+  // Re-pick stroke color at every stroke so it stays correct after a theme
+  // toggle (the canvas was init'd at page load and won't know the theme
+  // changed since).
+  sigCtx.strokeStyle = document.documentElement.classList.contains('light') ? '#0d1420' : '#f0f4fa';
+  sigDrawing = true;
+  sigLastPt = ptFromEv(e);
+  sigPlaceholder.style.display = 'none';
+}
+function moveDraw(e){
+  if (!sigDrawing) return;
+  e.preventDefault();
+  const p = ptFromEv(e);
+  sigCtx.beginPath();
+  sigCtx.moveTo(sigLastPt.x, sigLastPt.y);
+  sigCtx.lineTo(p.x, p.y);
+  sigCtx.stroke();
+  sigLastPt = p;
+  sigEmpty = false;
+  document.getElementById('sig-wrap').classList.remove('invalid');
+}
+function endDraw(){ sigDrawing = false; sigLastPt = null; }
+sigCanvas.addEventListener('mousedown', startDraw);
+sigCanvas.addEventListener('mousemove', moveDraw);
+sigCanvas.addEventListener('mouseup', endDraw);
+sigCanvas.addEventListener('mouseleave', endDraw);
+sigCanvas.addEventListener('touchstart', startDraw, { passive: false });
+sigCanvas.addEventListener('touchmove', moveDraw, { passive: false });
+sigCanvas.addEventListener('touchend', endDraw);
+document.getElementById('sig-clear').addEventListener('click', () => {
+  sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+  sizeSigCanvas();
+  sigEmpty = true;
+  sigPlaceholder.style.display = '';
+});
+
+/* ════════════════════════════════════════════════════════════════
+   AGREE CHECKBOX
+═════════════════════════════════════════════════════════════════ */
+const agreeRow = document.getElementById('agree-row');
+const agreeCk = document.getElementById('agree');
+agreeRow.addEventListener('click', (e) => {
+  if (e.target !== agreeCk) agreeCk.checked = !agreeCk.checked;
+  agreeRow.classList.toggle('checked', agreeCk.checked);
+  if (agreeCk.checked) agreeRow.classList.remove('invalid');
+});
+agreeCk.addEventListener('change', () => agreeRow.classList.toggle('checked', agreeCk.checked));
+
+/* Bank / Trade reference "separate sheet" override checkboxes.
+   Toggle the row visual + dim the ref fields when override is active so it
+   reads "you've opted out of these". Validation logic in validate() already
+   skips required-checks when these are on. */
+function bindOverride(rowId, ckId, refsId){
+  const row = document.getElementById(rowId);
+  const ck  = document.getElementById(ckId);
+  const refs = document.getElementById(refsId);
+  if (!row || !ck || !refs) return;
+  function paint(){
+    row.classList.toggle('checked', ck.checked);
+    refs.style.opacity = ck.checked ? '0.45' : '';
+    refs.style.pointerEvents = ck.checked ? 'none' : '';
+    // clear any prior invalid styling on the first row when override turns on
+    if (ck.checked) {
+      refs.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+    }
+  }
+  row.addEventListener('click', (e) => {
+    if (e.target !== ck) ck.checked = !ck.checked;
+    paint();
+  });
+  ck.addEventListener('change', paint);
+}
+bindOverride('bank-override-row',  'bank-override',  'bank-refs');
+bindOverride('trade-override-row', 'trade-override', 'trade-refs');
+
+/* ════════════════════════════════════════════════════════════════
+   TOAST
+═════════════════════════════════════════════════════════════════ */
+let toastTimer = null;
+function showToast(msg, kind = 'success', duration = 4200) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.remove('success', 'error');
+  t.classList.add(kind);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FORMAT VALIDATORS + AUTO-FORMAT (real-time per-field)
+
+   Each entry: {
+     test:      v => true|false       // is the value a valid format?
+     msg:       'human-readable error shown below the input'
+     normalize: v => v                // optional. Reformats as the user
+                                      // types (e.g. EIN → XX-XXXXXXX,
+                                      // phone → (XXX) XXX-XXXX)
+     allow:     v => v                // optional. Filters keystrokes
+                                      // (e.g. digits only) before normalize
+   }
+═════════════════════════════════════════════════════════════════ */
+function digitsOnly(v){ return String(v || '').replace(/\D/g, ''); }
+function formatPhone(v){
+  const d = digitsOnly(v).slice(0, 11);
+  if (d.length <= 3)  return d;
+  if (d.length <= 6)  return `(${d.slice(0,3)}) ${d.slice(3)}`;
+  if (d.length <= 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+  // 11 = leading 1
+  return `+${d.slice(0,1)} (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+}
+function formatEIN(v){
+  const d = digitsOnly(v).slice(0, 9);
+  if (d.length <= 2) return d;
+  return `${d.slice(0,2)}-${d.slice(2)}`;
+}
+function formatZip(v){
+  const d = digitsOnly(v).slice(0, 9);
+  if (d.length <= 5) return d;
+  return `${d.slice(0,5)}-${d.slice(5)}`;
+}
+function formatMoney(v){
+  // Allow digits + one decimal point.
+  let s = String(v || '').replace(/[^\d.]/g, '');
+  const firstDot = s.indexOf('.');
+  if (firstDot >= 0) s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, '');
+  // No thousands separators while typing (avoids cursor jump); we format
+  // on blur via a separate hook.
+  return s;
+}
+function blurMoney(el){
+  const n = Number(String(el.value).replace(/[^\d.]/g, ''));
+  if (!isNaN(n) && el.value.trim()) {
+    el.value = n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+}
+
+const VALIDATORS = {
+  'federal-id': {
+    test: v => /^\d{2}-\d{7}$/.test(v),
+    msg: 'Federal ID (EIN) must be 9 digits in the format XX-XXXXXXX.',
+    allow: digitsOnly,
+    normalize: formatEIN
+  },
+  'phone': {
+    test: v => { const d = digitsOnly(v); return d.length === 10 || (d.length === 11 && d.startsWith('1')); },
+    msg: 'Phone must be a 10-digit US number, e.g. (555) 123-4567.',
+    normalize: formatPhone
+  },
+  'fax': {
+    // Optional: blank passes, but if entered must be phone-shaped.
+    test: v => { const d = digitsOnly(v); return v === '' || d.length === 10 || (d.length === 11 && d.startsWith('1')); },
+    msg: 'Fax must be a 10-digit US number, e.g. (555) 123-4567 (leave blank if none).',
+    normalize: formatPhone
+  },
+  'zip': {
+    test: v => /^\d{5}(-\d{4})?$/.test(v),
+    msg: 'ZIP must be 5 digits or 5+4 (e.g. 92408 or 92408-1234).',
+    allow: digitsOnly,
+    normalize: formatZip
+  },
+  'year-opened': {
+    test: v => /^\d{4}$/.test(v) && +v >= 1800 && +v <= new Date().getFullYear(),
+    msg: `Year must be 4 digits between 1800 and ${new Date().getFullYear()}.`,
+    allow: v => digitsOnly(v).slice(0, 4)
+  },
+  'duns': {
+    // Optional: blank passes, but if entered must be 9 digits.
+    test: v => v === '' || /^\d{9}$/.test(digitsOnly(v)),
+    msg: 'DUNS must be 9 digits (leave blank if you don\'t have one).',
+    allow: v => digitsOnly(v).slice(0, 9)
+  },
+  'employees': {
+    test: v => v === '' || (/^\d+$/.test(v) && +v >= 1 && +v <= 1000000),
+    msg: 'Number of employees must be a positive whole number.',
+    allow: digitsOnly
+  },
+  'annual-revenue': {
+    test: v => v === '' || /^\d{1,3}(,\d{3})*(\.\d+)?$|^\d+(\.\d+)?$/.test(v),
+    msg: 'Annual revenue must be a number (digits only, e.g. 5000000).',
+    normalize: formatMoney
+  },
+  'credit-amount': {
+    test: v => /^\d{1,3}(,\d{3})*(\.\d+)?$|^\d+(\.\d+)?$/.test(v) && Number(v.replace(/,/g, '')) > 0,
+    msg: 'Credit amount must be a positive dollar amount (e.g. 50000).',
+    normalize: formatMoney
+  },
+  'website': {
+    test: v => /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/.*)?$/i.test(v),
+    msg: 'Web site must look like a URL, e.g. www.example.com or https://example.com.'
+  },
+  'sig-email': {
+    test: v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v),
+    msg: 'Email must be a valid address, e.g. name@company.com.'
+  }
+};
+
+// Generic email/phone validators applied to every contact row by data-field.
+const FIELD_VALIDATORS = {
+  email: { test: v => v === '' || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v), msg: 'Email must be a valid address, e.g. name@company.com.' },
+  phone: { test: v => { const d = digitsOnly(v); return v === '' || d.length === 10 || (d.length === 11 && d.startsWith('1')); }, msg: 'Phone must be a 10-digit US number.', normalize: formatPhone }
+};
+
+function showFieldError(el, msg){
+  el.classList.add('invalid');
+  let err = el.parentNode.querySelector('.form-error');
+  if (!err) {
+    err = document.createElement('div');
+    err.className = 'form-error';
+    el.parentNode.appendChild(err);
+  }
+  err.textContent = msg;
+}
+function clearFieldError(el){
+  el.classList.remove('invalid');
+  const err = el.parentNode.querySelector('.form-error');
+  if (err) err.remove();
+}
+
+function runValidator(el, v, options){
+  // options: { allowEmpty: bool }
+  const val = el.value.trim();
+  if (!val) {
+    // Empty: defer to required-checking elsewhere (don't show format error).
+    clearFieldError(el);
+    return true;
+  }
+  if (!v.test(val)) {
+    showFieldError(el, v.msg);
+    return false;
+  }
+  clearFieldError(el);
+  return true;
+}
+
+// Wire input/blur on every field that has a validator.
+function wireValidators(){
+  Object.keys(VALIDATORS).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const v = VALIDATORS[id];
+    el.addEventListener('input', () => {
+      if (v.allow) {
+        const cursorAtEnd = el.selectionStart === el.value.length;
+        const filtered = v.allow(el.value);
+        if (filtered !== el.value) el.value = filtered;
+      }
+      if (v.normalize) {
+        const before = el.value;
+        const out = v.normalize(before);
+        if (out !== before) el.value = out;
+      }
+      // While typing, clear stale errors but don't show new ones until blur.
+      el.classList.remove('invalid');
+      const err = el.parentNode.querySelector('.form-error');
+      if (err) err.remove();
+    });
+    el.addEventListener('blur', () => {
+      if (id === 'annual-revenue' || id === 'credit-amount') blurMoney(el);
+      runValidator(el, v);
+    });
+  });
+
+  // Contact rows: email + phone fields
+  document.querySelectorAll('[data-contact] [data-field]').forEach(el => {
+    const kind = el.dataset.field; // 'name' | 'phone' | 'email'
+    const v = FIELD_VALIDATORS[kind];
+    if (!v) return;
+    el.addEventListener('input', () => {
+      if (v.normalize) {
+        const out = v.normalize(el.value);
+        if (out !== el.value) el.value = out;
+      }
+      el.classList.remove('invalid');
+      const err = el.parentNode.querySelector('.form-error');
+      if (err) err.remove();
+    });
+    el.addEventListener('blur', () => runValidator(el, v));
+  });
+}
+wireValidators();
+
+/* ════════════════════════════════════════════════════════════════
+   COLLECT + VALIDATE
+═════════════════════════════════════════════════════════════════ */
+function val(id){ const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function setInvalid(el, bad){ el.classList.toggle('invalid', !!bad); }
+
+function collect() {
+  const data = {
+    org: {
+      name: val('org-name'),
+      federalId: val('federal-id'),
+      entityType: document.getElementById('entity-type').dataset.value || '',
+      address1: val('addr-1'),
+      address2: val('addr-2'),
+      city: val('city'),
+      county: val('county'),
+      state: val('state'),
+      zip: val('zip'),
+      bizType: val('biz-type'),
+      employees: val('employees'),
+      yearOpened: val('year-opened'),
+      annualRevenue: val('annual-revenue'),
+      bankruptcy: document.getElementById('bankruptcy').dataset.value || '',
+      bankruptcyDetail: val('bankruptcy-detail'),
+      phone: val('phone'),
+      fax: val('fax'),
+      website: val('website'),
+      duns: val('duns'),
+      salesRep: val('sales-rep'),
+      salesOrder: val('sales-order')
+    },
+    contacts: [],
+    po: {
+      required: document.getElementById('po-required').dataset.value || '',
+      instructions: val('po-instructions')
+    },
+    bankRefs: [],
+    bankOnSeparateSheet: document.getElementById('bank-override').checked,
+    tradeRefs: [],
+    tradeOnSeparateSheet: document.getElementById('trade-override').checked,
+    tax: {
+      exempt: document.getElementById('tax-exempt').dataset.value || '',
+      certificateAttached: fileBuckets.exemption.length > 0
+    },
+    credit: { amount: val('credit-amount') },
+    agreed: document.getElementById('agree').checked,
+    signer: {
+      name: val('sig-name'),
+      title: val('sig-title'),
+      email: val('sig-email'),
+      date: val('sig-date')
+    }
+  };
+  document.querySelectorAll('[data-contact]').forEach(row => {
+    data.contacts.push({
+      role: row.dataset.contact,
+      name: row.querySelector('[data-field=name]').value.trim(),
+      phone: row.querySelector('[data-field=phone]').value.trim(),
+      email: row.querySelector('[data-field=email]').value.trim()
+    });
+  });
+  document.querySelectorAll('#bank-refs .ref-row').forEach(r => {
+    data.bankRefs.push({
+      institution: r.querySelector('[data-field=institution]').value.trim(),
+      account: r.querySelector('[data-field=account]').value.trim(),
+      contact: r.querySelector('[data-field=contact]').value.trim()
+    });
+  });
+  document.querySelectorAll('#trade-refs .ref-row').forEach(r => {
+    data.tradeRefs.push({
+      institution: r.querySelector('[data-field=institution]').value.trim(),
+      account: r.querySelector('[data-field=account]').value.trim(),
+      contact: r.querySelector('[data-field=contact]').value.trim()
+    });
+  });
+  return data;
+}
+
+function validate() {
+  let bad = null;
+  // Track every invalid element so we can show a count + flash all of them
+  // after submit (not just the first one).
+  const bads = [];
+  const note = (el) => {
+    if (!el || bads.includes(el)) return;
+    bads.push(el);
+    if (!bad) bad = el;
+  };
+
+  // simple required text fields
+  // Per CFO audit: employees + DUNS optional; year-opened required.
+  const reqIds = ['org-name','federal-id','addr-1','city','county','state','zip','year-opened','phone','website','credit-amount','sig-name','sig-title','sig-email','sales-rep'];
+  reqIds.forEach(id => {
+    const el = document.getElementById(id);
+    const v = el.value.trim();
+    setInvalid(el, !v);
+    if (!v) {
+      showFieldError(el, 'This field is required.');
+      note(el);
+      return;
+    }
+    // Format check (if a validator exists for this field).
+    const fmt = VALIDATORS[id];
+    if (fmt && !fmt.test(v)) {
+      showFieldError(el, fmt.msg);
+      note(el);
+      return;
+    }
+    clearFieldError(el);
+  });
+
+  // Optional fields with format validators (DUNS, Employees, Annual Revenue, Fax).
+  ['duns','employees','annual-revenue','fax'].forEach(id => {
+    const el = document.getElementById(id);
+    const v = el.value.trim();
+    if (!v) return; // optional + empty = OK
+    const fmt = VALIDATORS[id];
+    if (fmt && !fmt.test(v)) {
+      showFieldError(el, fmt.msg);
+      note(el);
+    }
+  });
+
+  // Contact email + phone format checks.
+  document.querySelectorAll('[data-contact] [data-field]').forEach(el => {
+    const kind = el.dataset.field;
+    const fmt = FIELD_VALIDATORS[kind];
+    if (!fmt) return;
+    const v = el.value.trim();
+    if (!v) return; // required-emptiness handled below
+    if (!fmt.test(v)) {
+      showFieldError(el, fmt.msg);
+      note(el);
+    }
+  });
+
+  // toggle groups
+  ['entity-type','bankruptcy','po-required','tax-exempt'].forEach(id => {
+    const el = document.getElementById(id);
+    const ok = !!el.dataset.value;
+    el.classList.toggle('invalid', !ok);
+    if (!ok) note(el);
+  });
+
+  // contacts marked data-required — empty check (format check already ran above)
+  document.querySelectorAll('[data-contact] [data-required]').forEach(el => {
+    const v = el.value.trim();
+    if (!v) {
+      showFieldError(el, 'This field is required.');
+      note(el);
+    }
+  });
+
+  // First bank + trade row. Skipped when the user checks the corresponding
+  // "attaching a separate sheet" override (CFO audit). When override is on,
+  // we also clear any prior invalid styling on those rows so it doesn't look
+  // like they still need fixing.
+  const bankOverride  = document.getElementById('bank-override').checked;
+  const tradeOverride = document.getElementById('trade-override').checked;
+  const refChecks = [
+    { sel: '#bank-refs .ref-row:first-child',  skip: bankOverride  },
+    { sel: '#trade-refs .ref-row:first-child', skip: tradeOverride }
+  ];
+  refChecks.forEach(({ sel, skip }) => {
+    document.querySelectorAll(sel + ' [data-required]').forEach(el => {
+      if (skip) { setInvalid(el, false); return; }
+      const v = el.value.trim();
+      setInvalid(el, !v);
+      if (!v) note(el);
+    });
+  });
+
+  // Tax-exempt = Yes  →  at least one exemption certificate file required.
+  const taxExemptVal = document.getElementById('tax-exempt').dataset.value;
+  const exemptDz = document.querySelector('.dropzone[data-bucket="exemption"]');
+  if (taxExemptVal === 'Yes') {
+    const ok = fileBuckets.exemption.length > 0;
+    if (exemptDz) exemptDz.classList.toggle('invalid', !ok);
+    if (!ok) note(exemptDz);
+  } else if (exemptDz) {
+    exemptDz.classList.remove('invalid');
+  }
+
+  // email format on signer + contacts
+  const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const sigEmail = document.getElementById('sig-email');
+  if (sigEmail.value.trim() && !emailRx.test(sigEmail.value.trim())) {
+    setInvalid(sigEmail, true);
+    note(sigEmail);
+  }
+
+  // agreement
+  const agree = document.getElementById('agree');
+  agreeRow.classList.toggle('invalid', !agree.checked);
+  if (!agree.checked) note(agreeRow);
+
+  // signature
+  const sigWrap = document.getElementById('sig-wrap');
+  sigWrap.classList.toggle('invalid', sigEmpty);
+  if (sigEmpty) note(sigWrap);
+
+  // Flash every invalid field with a red pulse animation. Force a re-flow
+  // before re-adding `.flash` so the animation re-runs even when the field
+  // was already in an invalid state from a previous submit attempt.
+  bads.forEach(el => {
+    el.classList.remove('flash');
+    void el.offsetWidth; // reflow trick: forces animation to restart
+    el.classList.add('flash');
+  });
+
+  // Top-of-form error banner with count + "Jump to first" button.
+  const banner = document.getElementById('submit-error-banner');
+  if (banner) {
+    if (bads.length > 0) {
+      document.getElementById('submit-error-count').textContent = bads.length;
+      document.getElementById('submit-error-plural').textContent = bads.length === 1 ? '' : 's';
+      banner.classList.add('show');
+      // Re-run the banner's own flash animation
+      banner.style.animation = 'none';
+      void banner.offsetWidth;
+      banner.style.animation = '';
+    } else {
+      banner.classList.remove('show');
+    }
+  }
+
+  return bad;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PDF — navy header, sectioned body, footer bar (airviz-lite style)
+═════════════════════════════════════════════════════════════════ */
+function fmtMoney(s){
+  if (!s) return '';
+  const n = String(s).replace(/[^0-9.\-]/g, '');
+  if (!n) return s;
+  const num = Number(n);
+  if (isNaN(num)) return s;
+  return num.toLocaleString('en-US', { style:'currency', currency:'USD', maximumFractionDigits:0 });
+}
+
+function buildPDF(data, refNum) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const W = doc.internal.pageSize.getWidth();   // 612
+  const H = doc.internal.pageSize.getHeight();  // 792
+  const M = 40;
+  const cW = W - M * 2;
+  const FOOTER_H = 38;
+
+  /* Pre-render the navy gradient ONCE and reuse on every page. Previously
+     this was generated per-page (~30 KB JPEG × N pages of wasted bytes). */
+  const HEADER_H = 80;
+  let __navyJpeg = null;
+  try {
+    const cv = document.createElement('canvas');
+    cv.width = 1200; cv.height = Math.round(HEADER_H * (1200 / W));
+    const cx = cv.getContext('2d');
+    const g = cx.createLinearGradient(0,0,cv.width,cv.height);
+    g.addColorStop(0,'#0a1f33'); g.addColorStop(0.45,'#0f3152'); g.addColorStop(1,'#1a4a7a');
+    cx.fillStyle = g; cx.fillRect(0,0,cv.width,cv.height);
+    __navyJpeg = cv.toDataURL('image/jpeg', 0.92);
+  } catch(e) { /* fall back to solid fill in drawHeader */ }
+
+  /* ── HEADER (navy gradient + cyan strip) ─────────────────────── */
+  function drawHeader(pageLabel) {
+    const headerH = HEADER_H;
+    if (__navyJpeg) {
+      try { doc.addImage(__navyJpeg, 'JPEG', 0, 0, W, headerH, undefined, 'FAST'); }
+      catch(e) { doc.setFillColor(15,49,82).rect(0,0,W,headerH,'F'); }
+    } else {
+      doc.setFillColor(15,49,82).rect(0,0,W,headerH,'F');
+    }
+    doc.setFillColor(0,164,228).rect(0, headerH-2, W, 3, 'F');
+
+    // Wordmark left — use real PNG logo if it loaded from R2, otherwise text.
+    if (MA_WORDMARK_DATAURL) {
+      const lh = 30;                       // logo height in pt
+      const lw = lh * MA_WORDMARK_ASPECT;
+      const ly = (headerH - lh) / 2;
+      try { doc.addImage(MA_WORDMARK_DATAURL, 'PNG', M, ly, lw, lh); }
+      catch(e) {
+        doc.setFontSize(22).setFont('helvetica','bold').setTextColor(255,255,255);
+        doc.text('Macro', M, 38);
+        doc.setTextColor(0,164,228).text('Air', M + doc.getTextWidth('Macro'), 38);
+      }
+    } else {
+      doc.setFontSize(22).setFont('helvetica','bold').setTextColor(255,255,255);
+      doc.text('Macro', M, 38);
+      doc.setTextColor(0,164,228).text('Air', M + doc.getTextWidth('Macro'), 38);
+    }
+
+    // Title right
+    doc.setFontSize(14).setFont('helvetica','bold').setTextColor(255,255,255);
+    doc.text('CREDIT APPLICATION', W - M, 30, { align:'right' });
+    doc.setFontSize(8).setFont('helvetica','normal').setTextColor(180,215,235);
+    doc.text(refNum, W - M, 46, { align:'right' });
+    doc.setFontSize(8).setTextColor(160,195,225);
+    doc.text(`Date: ${data.signer.date}`, W - M, 60, { align:'right' });
+    if (pageLabel) doc.text(pageLabel, W - M, 72, { align:'right' });
+
+    return headerH;
+  }
+
+  /* ── FOOTER (navy bar) ───────────────────────────────────────── */
+  function drawFooter(pageNum, pageTotal) {
+    const top = H - FOOTER_H;
+    doc.setFillColor(15,49,82).rect(0, top, W, FOOTER_H, 'F');
+    // Logo image on the footer too — smaller (16pt tall), same fallback.
+    if (MA_WORDMARK_DATAURL) {
+      const lh = 16;
+      const lw = lh * MA_WORDMARK_ASPECT;
+      const ly = top + (FOOTER_H - lh) / 2;
+      try { doc.addImage(MA_WORDMARK_DATAURL, 'PNG', M, ly, lw, lh); }
+      catch(e) {
+        doc.setFontSize(10).setFont('helvetica','bold').setTextColor(255,255,255);
+        doc.text('Macro', M, top + FOOTER_H/2 + 4);
+        doc.setTextColor(0,164,228).text('Air', M + doc.getTextWidth('Macro'), top + FOOTER_H/2 + 4);
+      }
+    } else {
+      doc.setFontSize(10).setFont('helvetica','bold').setTextColor(255,255,255);
+      doc.text('Macro', M, top + FOOTER_H/2 + 4);
+      doc.setTextColor(0,164,228).text('Air', M + doc.getTextWidth('Macro'), top + FOOTER_H/2 + 4);
+    }
+
+    const baseY = top + FOOTER_H/2 + 3;
+    doc.setFontSize(8).setFont('helvetica','normal');
+    const seg1 = '866.668.3247';
+    const seg2 = 'www.macroairfans.com';
+    const seg3 = `© ${new Date().getFullYear()} MacroAir Technologies, Inc.`;
+    const sep = '  |  ';
+    const w1 = doc.getTextWidth(seg1), w2 = doc.getTextWidth(seg2), w3 = doc.getTextWidth(seg3), wS = doc.getTextWidth(sep);
+    const totalW = w1 + wS + w2 + wS + w3;
+    let fx = W - M - totalW;
+    doc.setTextColor(255,255,255).text(seg1, fx, baseY); fx += w1;
+    doc.setTextColor(120,145,175).text(sep, fx, baseY); fx += wS;
+    doc.setTextColor(255,255,255).text(seg2, fx, baseY); fx += w2;
+    doc.setTextColor(120,145,175).text(sep, fx, baseY); fx += wS;
+    doc.setTextColor(255,255,255).text(seg3, fx, baseY);
+
+    if (pageTotal > 1) {
+      // Clear the actual rendered logo: the image is 16pt tall × aspect wide
+      // (~83pt), much wider than the text width of "MacroAir" (~35pt) that
+      // was used before — which made the page label overlap the wordmark.
+      const logoW = MA_WORDMARK_DATAURL
+        ? 16 * MA_WORDMARK_ASPECT
+        : doc.getTextWidth('MacroAir');
+      doc.setFontSize(8).setTextColor(180,200,220);
+      doc.text(`Page ${pageNum} of ${pageTotal}`, M + logoW + 14, top + FOOTER_H/2 + 4);
+    }
+  }
+
+  /* helpers for drawing sections */
+  let y = 0;
+  const sectionGap = 10;
+
+  function ensure(spaceNeeded){
+    if (y + spaceNeeded > H - FOOTER_H - 14) {
+      doc.addPage();
+      y = drawHeader('Continued') + 16;
+    }
+  }
+  function sectionTitle(num, txt){
+    ensure(34);
+    doc.setFontSize(7).setFont('helvetica','bold').setTextColor(0,164,228);
+    doc.text(`SECTION ${num}`, M, y, { charSpace: 1 });
+    doc.setFontSize(12).setFont('helvetica','bold').setTextColor(15,49,82);
+    doc.text(txt, M, y + 14);
+    doc.setDrawColor(220,228,238).setLineWidth(0.6).line(M, y + 20, W - M, y + 20);
+    y += 30;
+  }
+  function fieldRow(label, value){
+    const lineH = 14;
+    const labW = 160;
+    const valLines = doc.splitTextToSize(String(value || '—'), cW - labW - 10);
+    ensure(lineH * Math.max(1, valLines.length) + 6);
+    doc.setFontSize(8).setFont('helvetica','normal').setTextColor(120,135,155);
+    doc.text(label.toUpperCase(), M, y, { charSpace: 0.4 });
+    doc.setFontSize(10).setFont('helvetica','bold').setTextColor(20,30,48);
+    doc.text(valLines, M + labW, y);
+    y += Math.max(lineH, valLines.length * 12) + 4;
+  }
+  function fieldGrid(pairs){
+    // 2-col grid
+    const colW = cW / 2;
+    const lineH = 14;
+    let i = 0;
+    while (i < pairs.length) {
+      ensure(lineH * 2 + 4);
+      for (let c = 0; c < 2; c++) {
+        const p = pairs[i + c];
+        if (!p) break;
+        const x = M + c * colW;
+        doc.setFontSize(7).setFont('helvetica','normal').setTextColor(120,135,155);
+        doc.text(p[0].toUpperCase(), x, y, { charSpace: 0.4 });
+        doc.setFontSize(10).setFont('helvetica','bold').setTextColor(20,30,48);
+        const lines = doc.splitTextToSize(String(p[1] || '—'), colW - 10);
+        doc.text(lines.slice(0, 2), x, y + 13);
+      }
+      y += lineH * 2 + 6;
+      i += 2;
+    }
+    y += 4;
+  }
+  function table(headers, rows){
+    const colW = cW / headers.length;
+    const lineH = 14;
+    ensure(lineH + rows.length * 28 + 8);
+    // header
+    doc.setFillColor(245,247,250).rect(M - 4, y - 10, cW + 8, 18, 'F');
+    doc.setFontSize(7).setFont('helvetica','bold').setTextColor(80,100,125);
+    headers.forEach((h, i) => doc.text(h.toUpperCase(), M + i * colW + 4, y + 2, { charSpace: 0.4 }));
+    y += 14;
+    // rows
+    rows.forEach((row, ri) => {
+      // Cap each cell at 3 lines max — anything longer truncates with "…"
+      // so one wild input can't blow rowH (and the whole PDF) up. This was
+      // the main cause of the 16-29 page bloat in earlier test submissions.
+      const MAX_LINES = 3;
+      const cellLines = row.map((c) => {
+        const split = doc.splitTextToSize(String(c || '—'), colW - 10);
+        if (split.length <= MAX_LINES) return split;
+        const last = split[MAX_LINES - 1] || '';
+        return [...split.slice(0, MAX_LINES - 1), last.slice(0, Math.max(0, last.length - 1)) + '…'];
+      });
+      const rowH = Math.min(48, Math.max(...cellLines.map(l => l.length)) * 11 + 8);
+      if (ri % 2 === 1) {
+        doc.setFillColor(250,251,253).rect(M - 4, y - 8, cW + 8, rowH, 'F');
+      }
+      cellLines.forEach((lines, i) => {
+        doc.setFontSize(9).setFont('helvetica','normal').setTextColor(20,30,48);
+        doc.text(lines, M + i * colW + 4, y + 2);
+      });
+      y += rowH;
+      ensure(28);
+    });
+    y += 6;
+  }
+
+  /* ── PAGE 1 ──────────────────────────────────────────────────── */
+  let headerH = drawHeader();
+  // applicant strip
+  doc.setFillColor(248,250,252).rect(0, headerH + 1, W, 30, 'F');
+  doc.setFontSize(13).setFont('helvetica','bold').setTextColor(15,49,82);
+  doc.text(data.org.name || '—', M, headerH + 20);
+  doc.setFontSize(9).setFont('helvetica','normal').setTextColor(95,115,140);
+  const credLine = `Net 30 requested: ${fmtMoney(data.credit.amount)}  ·  ${data.org.entityType || '—'}`;
+  doc.text(credLine, W - M, headerH + 20, { align: 'right' });
+  doc.setDrawColor(220,228,238).setLineWidth(0.5).line(0, headerH + 31, W, headerH + 31);
+
+  y = headerH + 50;
+
+  sectionTitle(1, 'Organizational Information');
+  fieldGrid([
+    ['Organization Name', data.org.name],
+    ['Federal ID (EIN)', data.org.federalId],
+    ['Type of Entity', data.org.entityType],
+    ['DUNS Number', data.org.duns],
+    ['MacroAir Sales Representative', data.org.salesRep],
+    ['Most Recent Sales Order #', data.org.salesOrder],
+    ['Type of Business', data.org.bizType],
+    ['Year Opened', data.org.yearOpened],
+    ['No. Employees', data.org.employees],
+    ['Annual Revenue', fmtMoney(data.org.annualRevenue)],
+    ['Phone', data.org.phone],
+    ['Fax', data.org.fax],
+    ['Web Site', data.org.website],
+    ['Bankruptcy', data.org.bankruptcy + (data.org.bankruptcyDetail ? ` — ${data.org.bankruptcyDetail}` : '')]
+  ]);
+  const addr = [data.org.address1, data.org.address2].filter(Boolean).join(', ');
+  const cityLine = `${data.org.city || ''}${data.org.county ? ', ' + data.org.county + ' County' : ''}, ${data.org.state || ''} ${data.org.zip || ''}`.replace(/^,\s*/, '').trim();
+  fieldRow('Billing Address', addr ? `${addr}\n${cityLine}` : cityLine);
+
+  sectionTitle(2, 'Primary Contacts');
+  table(
+    ['Position', 'Name', 'Phone', 'Email'],
+    data.contacts.map(c => [c.role, c.name, c.phone, c.email])
+  );
+
+  sectionTitle(3, 'Purchase Order');
+  fieldGrid([
+    ['PO Required', data.po.required],
+    ['Submission Instructions', data.po.instructions]
+  ]);
+
+  sectionTitle(4, 'Bank References');
+  if (data.bankOnSeparateSheet) {
+    fieldRow('Status', 'Bank references attached on a separate sheet (see attached documents).');
+  } else {
+    table(
+      ['Bank Name & Address', 'Account / Type / Date', 'Contact & Phone'],
+      data.bankRefs.filter(r => r.institution || r.account || r.contact)
+                   .map(r => [r.institution, r.account, r.contact])
+    );
+  }
+
+  sectionTitle(5, 'Trade References');
+  if (data.tradeOnSeparateSheet) {
+    fieldRow('Status', 'Trade references attached on a separate sheet (see attached documents).');
+  } else {
+    table(
+      ['Firm Name & Address', 'Product / Service / $', 'Contact & Phone'],
+      data.tradeRefs.filter(r => r.institution || r.account || r.contact)
+                    .map(r => [r.institution, r.account, r.contact])
+    );
+  }
+
+  sectionTitle(6, 'Resale / Sales Tax Exemption');
+  fieldGrid([
+    ['Exempt from Sales Tax', data.tax.exempt],
+    ['Exemption Certificate', data.tax.exempt === 'Yes' ? (data.tax.certificateAttached ? 'Attached (see attached documents)' : 'NOT ATTACHED') : 'N/A']
+  ]);
+
+  sectionTitle(7, 'Credit Request');
+  fieldGrid([
+    ['Net 30 Open Credit Requested', fmtMoney(data.credit.amount)],
+    ['Terms', 'Net 30 from invoice date']
+  ]);
+
+  /* ── TERMS PAGE ──────────────────────────────────────────────── */
+  doc.addPage();
+  drawHeader('Terms & Conditions');
+  y = headerH + 16;
+
+  sectionTitle('T', 'Payment Terms & Additional Terms and Conditions');
+
+  doc.setFontSize(9).setFont('helvetica','bold').setTextColor(15,49,82);
+  doc.text('Payment Terms', M, y); y += 12;
+  const paymentParas = [
+    'Payment terms are FOB MacroAir facility (FOB Origin), with title and risk of loss transferring to Buyer upon shipment, unless otherwise specified in writing. All invoices are due Net 30 from the invoice date unless otherwise approved in writing.',
+    'If a credit card is used for payment, Buyer agrees to pay a 3.0% transaction fee (based on the gross payment amount). Buyer is responsible for collecting payment from its customers.',
+    'Past due balances shall accrue a finance charge of 1.5% per month (or the maximum rate permitted under the Texas Finance Code), from the invoice date until paid in full.'
+  ];
+  doc.setFontSize(8.5).setFont('helvetica','normal').setTextColor(50,65,85);
+  paymentParas.forEach(p => {
+    const lines = doc.splitTextToSize(p, cW);
+    ensure(lines.length * 11 + 6);
+    doc.text(lines, M, y, { lineHeightFactor: 1.4 });
+    y += lines.length * 11 + 6;
+  });
+
+  ensure(20);
+  doc.setFontSize(9).setFont('helvetica','bold').setTextColor(15,49,82);
+  doc.text('Credit Authorization', M, y); y += 12;
+  doc.setFontSize(8.5).setFont('helvetica','normal').setTextColor(50,65,85);
+  const credAuth = doc.splitTextToSize(
+    'By submitting this application, Buyer authorizes MacroAir Technologies, Inc. to obtain and verify credit information, including banking and trade references provided. MacroAir reserves the right to request financial statements at its discretion.',
+    cW);
+  doc.text(credAuth, M, y, { lineHeightFactor: 1.4 });
+  y += credAuth.length * 11 + 10;
+
+  ensure(20);
+  doc.setFontSize(9).setFont('helvetica','bold').setTextColor(15,49,82);
+  doc.text('Additional Terms and Conditions', M, y); y += 12;
+  const tcs = [
+    'All invoices and sales are subject to these Terms and Conditions, which may be modified only in a written document signed by MacroAir. Any additional or conflicting terms contained in Buyer\'s purchase order, acknowledgment, or other documents are hereby rejected and shall not be binding unless expressly agreed to in writing by MacroAir.',
+    'Product warranties are governed solely by MacroAir\'s published warranty policy available on MacroAir\'s website or as otherwise provided in writing. All warranty obligations are expressly conditioned upon Buyer\'s payment in full of all amounts due, including any applicable fees or finance charges. Failure to timely pay shall suspend warranty coverage for the affected products, and the warranty period shall continue to run during any such suspension.',
+    'For Buyers located outside the United States, payment must be made by wire transfer unless otherwise agreed in writing. Buyer is responsible for all bank and transaction fees associated with such transfers.',
+    'Unless otherwise agreed in writing, all shipments are FOB Origin (MacroAir facility). Title and risk of loss pass to Buyer upon delivery to the carrier. Buyer is responsible for all freight, insurance, storage, handling, demurrage, and similar charges.',
+    'MacroAir shall not be liable for any delay or failure in performance caused by events beyond its reasonable control, including but not limited to acts of God, war, terrorism, governmental actions, labor disputes, supply shortages, transportation failures, or natural disasters.',
+    'Except as expressly provided in writing, MacroAir disclaims all warranties, express or implied, including any implied warranties of merchantability or fitness for a particular purpose.',
+    'MacroAir\'s liability for defective goods shall be limited, at its option, to repair, replacement, or refund of the purchase price of the affected goods. MacroAir shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including lost profits or business interruption.',
+    'If credit is extended, MacroAir reserves the right to suspend or revoke credit at any time if Buyer fails to pay when due or if MacroAir reasonably determines that Buyer\'s financial condition has materially changed. In such event, MacroAir may require advance payment before further shipments.',
+    'All disputes arising out of or relating to this Agreement shall be resolved by binding arbitration administered by the American Arbitration Association. The arbitration shall take place in Dallas, Texas, unless otherwise agreed in writing. Judgment on any award may be entered in any court of competent jurisdiction.',
+    'This Agreement may not be amended, modified, or waived except in a written document signed by an authorized representative of MacroAir.'
+  ];
+  doc.setFontSize(8.5).setFont('helvetica','normal').setTextColor(50,65,85);
+  tcs.forEach((t, i) => {
+    const lines = doc.splitTextToSize(`${i+1}. ${t}`, cW);
+    ensure(lines.length * 11 + 4);
+    doc.text(lines, M, y, { lineHeightFactor: 1.4 });
+    y += lines.length * 11 + 4;
+  });
+
+  ensure(28);
+  doc.setFontSize(8.5).setFont('helvetica','italic').setTextColor(80,95,115);
+  const govLines = doc.splitTextToSize('This Agreement shall be governed by and construed in accordance with the laws of the State of Texas, without regard to conflict of law principles.', cW);
+  doc.text(govLines, M, y, { lineHeightFactor: 1.4 });
+  y += govLines.length * 11 + 10;
+
+  /* ── SIGNATURE BLOCK (always on its own clean area) ──────────── */
+  ensure(180);
+  // panel
+  doc.setFillColor(248,250,252).rect(M - 8, y - 4, cW + 16, 150, 'F');
+  doc.setDrawColor(0,164,228).setLineWidth(2).line(M - 8, y - 4, M - 8, y + 146);
+  doc.setLineWidth(0.5);
+
+  doc.setFontSize(7).setFont('helvetica','bold').setTextColor(0,164,228);
+  doc.text('AUTHORIZED SIGNATURE', M + 4, y + 8, { charSpace: 1 });
+
+  // fields below
+  doc.setFontSize(8).setFont('helvetica','normal').setTextColor(120,135,155);
+  doc.text('SIGNATURE', M + 4, y + 92);
+  doc.text('PRINTED NAME', M + 4, y + 118);
+  doc.text('TITLE', M + 220, y + 118);
+  doc.text('DATE', M + 380, y + 118);
+
+  // sig image
+  try {
+    const sigData = sigCanvas.toDataURL('image/png');
+    const sigW = 220, sigH = 64;
+    doc.addImage(sigData, 'PNG', M + 4, y + 22, sigW, sigH);
+  } catch(e){}
+
+  // sig underline
+  doc.setDrawColor(150,165,185).setLineWidth(0.5).line(M + 4, y + 90, M + 230, y + 90);
+
+  // values
+  doc.setFontSize(11).setFont('helvetica','bold').setTextColor(20,30,48);
+  doc.text(data.signer.name || '—', M + 4, y + 132);
+  doc.text(data.signer.title || '—', M + 220, y + 132);
+  doc.text(data.signer.date || '—', M + 380, y + 132);
+
+  // certification
+  y += 156;
+  ensure(40);
+  doc.setFontSize(8).setFont('helvetica','italic').setTextColor(95,115,140);
+  const certify = doc.splitTextToSize(
+    `By signing above, ${data.signer.name || 'the signer'} certifies that the information provided in this credit application is true and complete to the best of their knowledge, and agrees to the Payment Terms and Additional Terms & Conditions set forth herein. Signed electronically with the same legal effect as a handwritten signature. Signer email: ${data.signer.email}.`,
+    cW);
+  doc.text(certify, M, y, { lineHeightFactor: 1.4 });
+
+  /* ── Footers on all pages ────────────────────────────────────── */
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    drawFooter(i, pageCount);
+  }
+
+  return doc;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SUBMIT
+═════════════════════════════════════════════════════════════════ */
+const submitBtn = document.getElementById('submit-btn');
+
+/* "Jump to first" button on the error banner scrolls to the first invalid
+   field still on the page (not the cached one from last validate() call). */
+const errorBanner = document.getElementById('submit-error-banner');
+const errorScrollBtn = document.getElementById('submit-error-scroll');
+if (errorScrollBtn) {
+  errorScrollBtn.addEventListener('click', () => {
+    const firstInvalid = document.querySelector('.invalid');
+    if (firstInvalid) {
+      firstInvalid.scrollIntoView({ behavior:'smooth', block:'center' });
+      try { firstInvalid.focus(); } catch(e){}
+    }
+  });
+}
+
+/* When the user fixes any field, re-tally invalid count and hide the banner
+   once everything is clean. Listens on the whole form so it catches inputs,
+   selects, yn-buttons (via click), checkboxes, and signature changes. */
+function tallyInvalidAndUpdateBanner() {
+  const count = document.querySelectorAll('.invalid').length
+              + (sigEmpty && document.getElementById('sig-wrap').classList.contains('invalid') ? 1 : 0)
+              - (document.getElementById('sig-wrap').classList.contains('invalid') ? 1 : 0);
+  // simpler: just count `.invalid` elements
+  const live = document.querySelectorAll('.invalid').length;
+  if (!errorBanner) return;
+  if (live === 0) {
+    errorBanner.classList.remove('show');
+  } else if (errorBanner.classList.contains('show')) {
+    document.getElementById('submit-error-count').textContent = live;
+    document.getElementById('submit-error-plural').textContent = live === 1 ? '' : 's';
+  }
+}
+document.getElementById('credit-form').addEventListener('input', () => setTimeout(tallyInvalidAndUpdateBanner, 30));
+document.getElementById('credit-form').addEventListener('change', () => setTimeout(tallyInvalidAndUpdateBanner, 30));
+document.getElementById('credit-form').addEventListener('click', () => setTimeout(tallyInvalidAndUpdateBanner, 80));
+
+submitBtn.addEventListener('click', async () => {
+  const bad = validate();
+  if (bad) {
+    showToast('Please fix the highlighted fields.', 'error');
+    bad.scrollIntoView({ behavior:'smooth', block:'center' });
+    if (bad.focus) try { bad.focus(); } catch(e){}
+    return;
+  }
+  // All clean — hide the banner if it was showing from a previous attempt.
+  if (errorBanner) errorBanner.classList.remove('show');
+
+  submitBtn.disabled = true;
+  const origLabel = submitBtn.textContent;
+  submitBtn.textContent = 'Generating PDF…';
+
+  const data = collect();
+  const today = new Date();
+  const refNum = `CA-${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  let pdfBase64 = null;
+  try {
+    const doc = buildPDF(data, refNum);
+    pdfBase64 = doc.output('datauristring').split(',')[1];
+  } catch (err) {
+    console.error('PDF generation failed', err);
+    showToast('PDF generation failed. Please try again.', 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = origLabel;
+    return;
+  }
+
+  // Convert uploaded files (exemption cert + supporting docs) to base64 so the
+  // worker can attach them to the email alongside the generated PDF.
+  submitBtn.textContent = 'Packaging files…';
+  const attachments = [];
+  for (const bucket of ['exemption', 'supporting']) {
+    for (const f of fileBuckets[bucket]) {
+      if (f.size > MAX_FILE_SIZE) continue;
+      try {
+        const content = await fileToBase64(f);
+        attachments.push({
+          filename: f.name,
+          content,
+          contentType: f.type || 'application/octet-stream',
+          bucket  // 'exemption' or 'supporting' — worker can label/route if needed
+        });
+      } catch(e){ console.warn('file encode failed', f.name, e); }
+    }
+  }
+
+  submitBtn.textContent = 'Submitting…';
+  /* Delivery is only confirmed when the worker replies 2xx AND the response
+     body says success:true (the worker checks Resend's actual answer). No
+     more "show success regardless" — a lost credit application must never
+     look like a submitted one. */
+  let delivered = false;
+  let deliveryError = null;
+  try {
+    const r = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Form-Token': FORM_TOKEN },
+      body: JSON.stringify({
+        refNum,
+        submittedAt: today.toISOString(),
+        applicantName: data.org.name,
+        signerEmail: data.signer.email,
+        signerName: data.signer.name,
+        signerTitle: data.signer.title,
+        creditAmount: data.credit.amount,
+        form: data,
+        pdfBase64,
+        attachments,
+        source: 'credit-application'
+      })
+    });
+    let result = null;
+    try { result = await r.json(); } catch(e){}
+    delivered = r.ok && !!result && result.success === true;
+    if (!delivered) deliveryError = (result && result.error && JSON.stringify(result.error)) || ('HTTP ' + r.status);
+  } catch (err) {
+    deliveryError = err && err.message ? err.message : String(err);
+  }
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = origLabel;
+
+  // Either way, give the user their signed PDF — it's their copy, and on
+  // failure it's also what they'll forward to AR manually.
+  try {
+    const docDl = buildPDF(data, refNum);
+    docDl.save(`MacroAir-Credit-Application-${data.org.name.replace(/[^a-z0-9]+/gi, '-') || 'Applicant'}-${refNum}.pdf`);
+  } catch(e){}
+
+  if (delivered) {
+    document.getElementById('modal-ref').textContent = `Reference: ${refNum}`;
+    document.getElementById('success-modal').classList.add('open');
+  } else {
+    console.error('Submission delivery failed:', deliveryError);
+    showToast('We couldn\'t deliver your application (' + refNum + '). Your signed PDF has been downloaded — please try again, or email it to ar@macroairfans.com.', 'error', 12000);
+  }
+});
+</script>
+</body>
+</html>
